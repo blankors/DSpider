@@ -2,6 +2,7 @@ import pytest
 from unittest import mock
 import os
 import json
+import yaml
 from worker.worker import WorkerNode
 import requests
 
@@ -24,23 +25,31 @@ class TestWorkerNode:
     
     @mock.patch('os.path.exists')
     @mock.patch('builtins.open', new_callable=mock.mock_open)
+    @mock.patch('yaml.safe_load')
     @mock.patch('json.load')
-    def test_load_config(self, mock_json_load, mock_open, mock_exists, mock_logger_config, sample_config):
+    def test_load_config(self, mock_json_load, mock_yaml_load, mock_open, mock_exists, mock_logger_config, sample_config):
         """测试加载配置文件"""
         # 简化mock设置，避免路径问题
         mock_json_load.return_value = sample_config
+        mock_yaml_load.return_value = sample_config
         mock_exists.return_value = True
         
-        # 初始化WorkerNode
+        # 测试JSON配置加载
         worker = WorkerNode('test_config.json')
-        
-        # 测试_load_config方法
         config = worker._load_config('test_config.json')
-        
-        # 验证配置加载
         assert config == sample_config
-        # 只验证配置文件被调用，不限制调用次数
         mock_open.assert_any_call('test_config.json', 'r', encoding='utf-8')
+        mock_json_load.assert_called_once()
+        
+        # 测试YAML配置加载
+        mock_open.reset_mock()
+        mock_yaml_load.reset_mock()
+        mock_json_load.reset_mock()
+        
+        config = worker._load_config('test_config.yaml')
+        assert config == sample_config
+        mock_open.assert_any_call('test_config.yaml', 'r', encoding='utf-8')
+        mock_yaml_load.assert_called_once()
     
     @mock.patch('os.path.exists')
     def test_load_config_with_default(self, mock_exists, mock_logger_config):

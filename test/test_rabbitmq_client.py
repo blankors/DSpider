@@ -1,12 +1,12 @@
 import pytest
 from unittest import mock
-from common.rabbitmq_client import RabbitMQConnection
+from common.rabbitmq_client import RabbitMQClient
 import pika
 
 class TestRabbitMQConnection:
     def test_init(self):
         """测试初始化功能"""
-        rabbit_client = RabbitMQConnection(
+        rabbit_client = RabbitMQClient(
             host='test_host',
             port=5672,
             username='test_user',
@@ -30,7 +30,7 @@ class TestRabbitMQConnection:
         mock_channel = mock.MagicMock()
         mock_connection.channel.return_value = mock_channel
         
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         
         # 测试连接
         result = rabbit_client.connect()
@@ -55,7 +55,7 @@ class TestRabbitMQConnection:
         # 模拟连接失败
         mock_blocking_connection.side_effect = Exception("连接失败")
         
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         
         # 测试连接
         result = rabbit_client.connect(max_retries=2)
@@ -65,7 +65,7 @@ class TestRabbitMQConnection:
     
     def test_disconnect(self):
         """测试断开连接功能"""
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         
         # 测试没有连接的情况
         rabbit_client.disconnect()
@@ -80,7 +80,7 @@ class TestRabbitMQConnection:
     
     def test_declare_queue_success(self):
         """测试声明队列成功情况"""
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         rabbit_client.channel = mock.MagicMock()
         
         # 测试声明队列
@@ -97,7 +97,7 @@ class TestRabbitMQConnection:
     
     def test_declare_queue_with_channel_none(self):
         """测试没有channel时声明队列的情况"""
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         
         # 测试声明队列
         result = rabbit_client.declare_queue('test_queue')
@@ -106,7 +106,7 @@ class TestRabbitMQConnection:
     
     def test_declare_exchange_success(self):
         """测试声明交换机成功情况"""
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         rabbit_client.channel = mock.MagicMock()
         
         # 测试声明交换机
@@ -122,7 +122,7 @@ class TestRabbitMQConnection:
     
     def test_bind_queue_success(self):
         """测试绑定队列成功情况"""
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         rabbit_client.channel = mock.MagicMock()
         
         # 测试绑定队列
@@ -143,7 +143,7 @@ class TestRabbitMQConnection:
         mock_basic_properties.return_value = 'test_properties'
         mock_json_dumps.return_value = '{"key":"value"}'
         
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         rabbit_client.channel = mock.MagicMock()
         
         # 测试发布消息
@@ -166,7 +166,7 @@ class TestRabbitMQConnection:
         # 模拟
         mock_basic_properties.return_value = 'test_properties'
         
-        rabbit_client = RabbitMQConnection()
+        rabbit_client = RabbitMQClient()
         rabbit_client.channel = mock.MagicMock()
         
         # 测试发布消息

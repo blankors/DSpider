@@ -1,16 +1,17 @@
 import os
 import json
+import yaml
 import time
 import logging
 from typing import Dict, Any, List
 from common.mongodb_client import MongoDBConnection
-from common.rabbitmq_client import RabbitMQConnection
+from common.rabbitmq_client import RabbitMQClient
 from common.logger_config import LoggerConfig
 
 class ProcessorNode:
     """数据处理节点"""
     
-    def __init__(self, config_path: str = './config/config.json'):
+    def __init__(self, config_path: str = '../config/config.yaml'):
         """初始化Processor节点
         
         Args:
@@ -27,9 +28,13 @@ class ProcessorNode:
         self.config = self._load_config(config_path)
         
         # 如果有日志配置，可以重新配置logger
-        log_config_path = os.path.join(os.path.dirname(config_path), 'logging.json')
-        if os.path.exists(log_config_path):
-            self.logger = LoggerConfig.setup_logger(log_config_path, name='processor')
+        # 优先尝试YAML格式配置
+        log_config_path_yaml = os.path.join(os.path.dirname(config_path), 'logging.yaml')
+        if os.path.exists(log_config_path_yaml):
+            self.logger = LoggerConfig.setup_logger(log_config_path_yaml, name='processor')
+        # 其次尝试JSON格式配置
+        elif os.path.exists(os.path.join(os.path.dirname(config_path), 'logging.json')):
+            self.logger = LoggerConfig.setup_logger(os.path.join(os.path.dirname(config_path), 'logging.json'), name='processor')
         elif 'logging' in self.config:
             self.logger = LoggerConfig.setup_logger(
                 log_level=logging.INFO,
@@ -47,7 +52,7 @@ class ProcessorNode:
         )
         
         # 初始化RabbitMQ连接
-        self.rabbitmq_client = RabbitMQConnection(
+        self.rabbitmq_client = RabbitMQClient(
             host=self.config['rabbitmq']['host'],
             port=self.config['rabbitmq']['port'],
             username=self.config['rabbitmq']['username'],
@@ -76,7 +81,10 @@ class ProcessorNode:
         """
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                if config_path.endswith('.yaml') or config_path.endswith('.yml'):
+                    return yaml.safe_load(f)
+                else:
+                    return json.load(f)
         except Exception as e:
             self.logger.error(f"加载配置文件失败: {str(e)}")
             # 返回默认配置

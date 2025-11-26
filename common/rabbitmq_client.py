@@ -4,14 +4,17 @@ import json
 import time
 from typing import Optional, Dict, Any, Callable, Union
 
+from pika.exceptions import ChannelClosedByBroker, ConnectionClosedByBroker, IncompatibleProtocolError, StreamLostError
+from pika import BasicProperties
+
+from common.load_config import config
+
 logger = logging.getLogger(__name__)
 
-class RabbitMQConnection:
+class RabbitMQClient:
     """RabbitMQ连接管理类"""
     
-    def __init__(self, host: str = 'localhost', port: int = 5672,
-                 username: str = 'guest', password: str = 'guest',
-                 virtual_host: str = '/'):
+    def __init__(self, host: str, port: int, username: str, password: str, virtual_host: str):
         """初始化RabbitMQ连接
         
         Args:
@@ -100,6 +103,30 @@ class RabbitMQConnection:
             logger.error(f"声明队列失败: {str(e)}")
             return False
     
+    def declare_priority_queue(self, queue_name: str, priority: int = 0,
+                               durable: bool = True, exclusive: bool = False,
+                               auto_delete: bool = False) -> bool:
+        """声明优先级队列
+        
+        Args:
+            queue_name: 队列名称
+            priority: 优先级（0-9）
+            durable: 是否持久化
+            exclusive: 是否排他
+            auto_delete: 是否自动删除
+            
+        Returns:
+            bool: 是否声明成功
+        """
+        arguments = {'x-max-priority': 10}
+        return self.declare_queue(
+            queue_name,
+            durable=durable,
+            exclusive=exclusive,
+            auto_delete=auto_delete,
+            arguments=arguments
+        )
+    
     def declare_exchange(self, exchange_name: str, exchange_type: str = 'direct',
                         durable: bool = True, auto_delete: bool = False) -> bool:
         """声明交换机
@@ -129,6 +156,57 @@ class RabbitMQConnection:
         except Exception as e:
             logger.error(f"声明交换机失败: {str(e)}")
             return False
+    
+    def publish(self, message: any, routing_key: str, exchange: str = "", priority: int = 15, **kwargs):
+        """
+        发送到队列,json比data更优先
+        :param routing_key: 路由绑定
+        :param exchange: 交换机
+        :param message:
+        :param priority: 优先级,历史数据消息等级2, 日常消息等级15, 非优先级队列该参数无效
+        :return: None
+        :raise MessageSendError:
+        """
+
+        if not self.channel:
+            raise ConnectionError("未连接channel")
+
+        if isinstance(message, str):
+            message = message.encode("utf-8")
+        elif isinstance(message, dict):
+            message = json.dumps(message)
+        else:
+            raise TypeError("message must be str or dict")
+
+        # 尝试发送消息三次
+        retry_times = 3
+        while retry_times:
+            try:
+                self.channel.basic_publish(
+                    exchange=exchange,
+                    routing_key=routing_key,
+                    body=message,
+                    properties=BasicProperties(
+                        delivery_mode=2,  # 2-持久化
+                        priority=priority,
+                        **kwargs,
+                    ),
+                )
+                return
+            # 只处理链接丢失相关的错误
+            except (StreamLostError, ChannelClosedByBroker, IncompatibleProtocolError, ConnectionClosedByBroker):
+                # pika.exceptions.ChannelWrongStateError: Channel is closed.
+                logging.warning("检测到rabbit mq 链接丢失，重新链接")
+                self.reset_connection()
+                retry_times -= 1
+
+        raise Exception(f"消息发送失败: {message}, 请检查消息服务器是否存活")
+    
+    def publish_workqueue(self, message: any, queue_name: str, priority: int = 15, **kwargs):
+        '''
+        工作队列，无交换机，直接发送到队列
+        '''
+        self.publish(message, queue_name, '', priority, **kwargs)
     
     def bind_queue(self, queue_name: str, exchange_name: str,
                    routing_key: str = '') -> bool:
@@ -302,3 +380,15 @@ class RabbitMQConnection:
         except Exception as e:
             logger.error(f"获取队列消息数失败: {str(e)}")
             return 0
+
+try:
+    rabbitmq_client = RabbitMQClient(
+        host=config['rabbitmq']['host'],
+        port=config['rabbitmq']['port'],
+        username=config['rabbitmq']['username'],
+        password=config['rabbitmq']['password'],
+        virtual_host=config['rabbitmq']['virtual_host']
+    )
+    rabbitmq_client.connect()
+except Exception as e:
+    logger.error(f"RabbitMQ连接失败: {str(e)}")

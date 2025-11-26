@@ -1,16 +1,21 @@
 import os
 import json
+import yaml
 import time
 import logging
 import requests
 from typing import Dict, Any, Optional
-from common.rabbitmq_client import RabbitMQConnection
-from common.logger_config import LoggerConfig
+import uuid
+import logging
 
-class WorkerNode:
+from common.rabbitmq_client import RabbitMQClient, rabbitmq_client
+from common.logger_config import LoggerConfig
+from worker.worker_config import worker_config
+
+class WorkerNode1:
     """爬虫Worker节点"""
     
-    def __init__(self, config_path: str = './config/config.json', worker_id: Optional[str] = None):
+    def __init__(self, config_path: str = '../config/config.yaml', worker_id: Optional[str] = None):
         """初始化Worker节点
         
         Args:
@@ -31,10 +36,18 @@ class WorkerNode:
         self.config = self._load_config(config_path)
         
         # 如果有日志配置，可以重新配置logger
-        log_config_path = os.path.join(os.path.dirname(config_path), 'logging.json')
-        if os.path.exists(log_config_path):
+        # 尝试加载YAML格式的日志配置，如果不存在则尝试JSON格式
+        log_config_yaml = os.path.join(os.path.dirname(config_path), 'logging.yaml')
+        log_config_json = os.path.join(os.path.dirname(config_path), 'logging.json')
+        
+        if os.path.exists(log_config_yaml):
             self.logger = LoggerConfig.setup_logger(
-                log_config_path, 
+                log_config_yaml, 
+                name=f'worker_{self.worker_id}'
+            )
+        elif os.path.exists(log_config_json):
+            self.logger = LoggerConfig.setup_logger(
+                log_config_json, 
                 name=f'worker_{self.worker_id}'
             )
         elif 'logging' in self.config:
@@ -45,7 +58,7 @@ class WorkerNode:
             )
         
         # 初始化RabbitMQ连接
-        self.rabbitmq_client = RabbitMQConnection(
+        self.rabbitmq_client = RabbitMQClient(
             host=self.config['rabbitmq']['host'],
             port=self.config['rabbitmq']['port'],
             username=self.config['rabbitmq']['username'],
@@ -61,7 +74,7 @@ class WorkerNode:
         self.timeout = self.config['worker']['timeout']
     
     def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """加载配置文件
+        """加载配置文件（支持YAML和JSON格式）
         
         Args:
             config_path: 配置文件路径
@@ -71,7 +84,10 @@ class WorkerNode:
         """
         try:
             with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
+                if config_path.endswith('.yaml') or config_path.endswith('.yml'):
+                    return yaml.safe_load(f)
+                else:
+                    return json.load(f)
         except Exception as e:
             self.logger.error(f"加载配置文件失败: {str(e)}")
             # 返回默认配置
@@ -310,6 +326,60 @@ class WorkerNode:
             self.logger.info(f"[{self.worker_id}] 清理资源...")
             self.rabbitmq_client.disconnect()
             self.logger.info(f"[{self.worker_id}] Worker节点已停止")
+
+class WorkerNode:
+    def __init__(self):
+        self.worker_id = str(uuid.uuid4())[:8]
+        self.rabbitmq_client = rabbitmq_client
+        self.queue_name = worker_config['queue_name']
+        self.prefetch_count = worker_config['prefetch_count']
+        self.logger = logging.getLogger(f"WorkerNode-{self.worker_id}")
+    
+    def run(self):
+        self.rabbitmq_client.consume_messages(
+            self.queue_name,
+            callback=self.process_task,
+            auto_ack=False,
+            prefetch_count=self.prefetch_count
+        )
+    
+    def process_task(self, task: Dict[str, Any], properties: Dict[str, Any]) -> bool:
+        """处理单个任务
+        
+        Args:
+            task: 任务数据
+            properties: 消息属性
+            
+        Returns:
+            bool: 是否成功处理
+        """
+        self.logger.info(f"[{self.worker_id}] 收到任务: {task.get('_id', 'unknown')}")
+        print(task)
+        time.sleep(10)
+        return False
+        try:
+            print(task)
+            # 执行抓取
+            # fetch_result = self.fetch_url(task)
+            
+            # 解析结果
+            # final_result = self.parse_response(task, fetch_result)
+            
+            # 发送结果到RabbitMQ
+            # if self.rabbitmq_client.publish_message(
+            #     self.result_exchange,
+            #     self.result_routing_key,
+            #     final_result
+            # ):
+            #     self.logger.info(f"[{self.worker_id}] 结果已发送: {task.get('_id', 'unknown')}")
+            #     return True
+            # else:
+            #     self.logger.error(f"[{self.worker_id}] 结果发送失败: {task.get('_id', 'unknown')}")
+            #     return False
+                
+        except Exception as e:
+            self.logger.error(f"[{self.worker_id}] 处理任务时出错: {str(e)}")
+            return False
 
 if __name__ == '__main__':
     worker = WorkerNode()

@@ -3,14 +3,14 @@ import logging
 import time
 from typing import Optional, Dict, Any, List
 
+from common.load_config import config
+
 logger = logging.getLogger(__name__)
 
 class MongoDBConnection:
     """MongoDB连接管理类"""
     
-    def __init__(self, host: str = 'localhost', port: int = 27017, 
-                 username: Optional[str] = None, password: Optional[str] = None,
-                 db_name: str = 'spider_db'):
+    def __init__(self, host: str, port: int, username: Optional[str], password: Optional[str], db_name: str):
         """初始化MongoDB连接
         
         Args:
@@ -27,6 +27,7 @@ class MongoDBConnection:
         self.db_name = db_name
         self.client = None
         self.db = None
+        print(f"host: {self.host}, port: {self.port}, username: {self.username}, password: {self.password}, db_name: {self.db_name}")
     
     def connect(self, max_retries: int = 3, retry_delay: int = 2) -> bool:
         """连接到MongoDB
@@ -45,7 +46,8 @@ class MongoDBConnection:
                         host=self.host,
                         port=self.port,
                         username=self.username,
-                        password=self.password
+                        password=self.password,
+                        authSource='admin'  # 指定使用admin数据库进行认证
                     )
                 else:
                     self.client = pymongo.MongoClient(host=self.host, port=self.port)
@@ -76,24 +78,29 @@ class MongoDBConnection:
         Returns:
             Collection: MongoDB集合对象
         """
-        if not self.db:
+        if self.db is None:
             logger.error("MongoDB未连接")
             return None
         return self.db[collection_name]
     
-    def insert_one(self, collection_name: str, document: Dict[str, Any]) -> Optional[str]:
+    def insert_one(self, collection_name: str, document: Dict[str, Any], options: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """插入单条文档
         
         Args:
             collection_name: 集合名称
             document: 文档数据
+            options: 插入选项（如指定_id）
             
         Returns:
             str: 插入的文档ID，失败返回None
         """
+        # 如果指定了_id，将其添加到文档中
+        if options and 'id' in options:
+            document['_id'] = options['id']
+        
         try:
             collection = self.get_collection(collection_name)
-            if collection:
+            if collection is not None:
                 result = collection.insert_one(document)
                 logger.info(f"成功插入文档到 {collection_name}")
                 return str(result.inserted_id)
@@ -113,7 +120,7 @@ class MongoDBConnection:
         """
         try:
             collection = self.get_collection(collection_name)
-            if collection:
+            if collection is not None:
                 result = collection.insert_many(documents)
                 logger.info(f"成功插入 {len(documents)} 条文档到 {collection_name}")
                 return [str(_id) for _id in result.inserted_ids]
@@ -134,7 +141,7 @@ class MongoDBConnection:
         """
         try:
             collection = self.get_collection(collection_name)
-            if collection:
+            if collection is not None:
                 return collection.find_one(query, projection)
         except Exception as e:
             logger.error(f"查找文档失败: {str(e)}")
@@ -157,7 +164,7 @@ class MongoDBConnection:
         """
         try:
             collection = self.get_collection(collection_name)
-            if collection:
+            if collection is not None:
                 cursor = collection.find(query, projection)
                 if skip > 0:
                     cursor = cursor.skip(skip)
@@ -182,7 +189,7 @@ class MongoDBConnection:
         """
         try:
             collection = self.get_collection(collection_name)
-            if collection:
+            if collection is not None:
                 result = collection.update_one(query, update)
                 logger.info(f"更新文档结果: 匹配 {result.matched_count}, 修改 {result.modified_count}")
                 return result.modified_count > 0
@@ -202,8 +209,21 @@ class MongoDBConnection:
         """
         try:
             collection = self.get_collection(collection_name)
-            if collection:
+            if collection is not None:
                 return collection.count_documents(query or {})
         except Exception as e:
             logger.error(f"统计文档失败: {str(e)}")
         return 0
+
+mongodb_config = config.get('mongodb')
+try:
+    mongodb_conn = MongoDBConnection(
+        host=mongodb_config.get('host', 'localhost'),
+        port=mongodb_config.get('port', 27017),
+        username=mongodb_config.get('username', None),
+        password=mongodb_config.get('password', None),
+        db_name=mongodb_config.get('db_name', 'spider_db')
+    )
+    mongodb_conn.connect()
+except Exception as e:
+    logger.error(f"MongoDB连接失败: {str(e)}")

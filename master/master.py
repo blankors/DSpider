@@ -1,16 +1,16 @@
 import os
-import json
 import time
 import logging
 from typing import Dict, Any, List
 from common.mongodb_client import MongoDBConnection
-from common.rabbitmq_client import RabbitMQConnection
+from common.rabbitmq_client import RabbitMQClient
 from common.logger_config import LoggerConfig
+from common.config_manager import load_config
 
 class MasterNode:
     """爬虫Master节点"""
     
-    def __init__(self, config_path: str = '../config/config.json'):
+    def __init__(self, config_path: str = '../config/config.yaml'):
         """初始化Master节点
         
         Args:
@@ -20,9 +20,14 @@ class MasterNode:
         self.config = self._load_config(config_path)
         
         # 设置日志
-        log_config_path = os.path.join(os.path.dirname(config_path), 'logging.json')
-        if os.path.exists(log_config_path):
-            self.logger = LoggerConfig.setup_logger(log_config_path, name='master')
+        # 尝试加载YAML格式的日志配置，如果不存在则尝试JSON格式
+        log_config_yaml = os.path.join(os.path.dirname(config_path), 'logging.yaml')
+        log_config_json = os.path.join(os.path.dirname(config_path), 'logging.json')
+        
+        if os.path.exists(log_config_yaml):
+            self.logger = LoggerConfig.setup_logger(log_config_yaml, name='master')
+        elif os.path.exists(log_config_json):
+            self.logger = LoggerConfig.setup_logger(log_config_json, name='master')
         else:
             self.logger = LoggerConfig.setup_logger(
                 log_level=logging.INFO,
@@ -40,7 +45,7 @@ class MasterNode:
         )
         
         # 初始化RabbitMQ连接
-        self.rabbitmq_client = RabbitMQConnection(
+        self.rabbitmq_client = RabbitMQClient(
             host=self.config['rabbitmq']['host'],
             port=self.config['rabbitmq']['port'],
             username=self.config['rabbitmq']['username'],
@@ -64,35 +69,7 @@ class MasterNode:
         Returns:
             Dict[str, Any]: 配置字典
         """
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"加载配置文件失败: {str(e)}")
-            # 返回默认配置
-            return {
-                'mongodb': {
-                    'host': 'localhost',
-                    'port': 27017,
-                    'username': '',
-                    'password': '',
-                    'db_name': 'spider_db'
-                },
-                'rabbitmq': {
-                    'host': 'localhost',
-                    'port': 5672,
-                    'username': 'guest',
-                    'password': 'guest',
-                    'virtual_host': '/'
-                },
-                'master': {
-                    'task_queue': 'spider_tasks',
-                    'exchange_name': 'spider_exchange',
-                    'routing_key': 'task',
-                    'task_batch_size': 100,
-                    'polling_interval': 5
-                }
-            }
+        return load_config(config_path)
     
     def initialize(self) -> bool:
         """初始化连接和资源
