@@ -4,11 +4,16 @@ from typing import List, Dict, Callable
 from pydispatch import dispatcher
 import requests
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Dict
+import platform
+import asyncio
 
 from playwright.sync_api import sync_playwright
 
 from common.rabbitmq_client import rabbitmq_client
+import logging
+
+logger = logging.getLogger(__name__)
 
 class CookieUpdater:
     """
@@ -28,30 +33,29 @@ class CookieUpdater:
         self.running = False
         self.thread = None
         
-        self.playwright = sync_playwright().start()
-        self.browser = self.playwright.chromium.launch(headless=True)
         self.rabbitmq_client = rabbitmq_client
         
         # 注册信号处理器
         dispatcher.connect(self.handle_spider_signal, signal="NEED_COOKIE", sender=dispatcher.Any)
     
-    def start(self):
+    def start_v1(self):
         """启动定时更新线程"""
-        if not self.running:
-            self.running = True
-            self.thread = threading.Thread(target=self._periodic_update)
-            self.thread.daemon = True
-            self.thread.start()
-            print("CookieUpdater started")
+        # if not self.running:
+        #     self.running = True
+        #     self.thread = threading.Thread(target=self._periodic_update)
+        #     self.thread.daemon = True
+        #     self.thread.start()
+        #     print("CookieUpdater started")
     
     def stop(self):
         """停止定时更新"""
         self.running = False
         if self.thread:
             self.thread.join()
+        self.playwright.stop()
         print("CookieUpdater stopped")
     
-    def _periodic_update(self):
+    def start(self):
         """定时批量更新cookie"""
         self.rabbitmq_client.consume_messages(
             queue_name='sql2mq',
@@ -79,8 +83,21 @@ class CookieUpdater:
         Args:
             data: 包含URL的消息数据
         """
-        print(f"Updating cookie for URL: {data}")
-        time.sleep(10)
+        try:
+            # 解析 URL
+            url = data['url']
+            logger.info(f"Received URL: {url}")
+            
+            # 调用 Celery 任务处理 URL
+            from .cookie_updater import process_url_task
+            process_url_task.delay(url)
+            logger.info(f"Submitted Celery task for URL: {url}")
+            
+            return True  # 确认消息
+        except Exception as e:
+            logger.error(f"Error handling message: {str(e)}")
+            return False  # 拒绝消息
+        # time.sleep(10)
         # self._update_single_cookie1(url)
         
     def handle_spider_signal(self, signal_url: str):
@@ -167,3 +184,136 @@ class CookieUpdater:
         """
         with self.lock:
             return self.cookies.copy()
+
+from common.celery_config import celery_app
+from playwright.async_api import async_playwright
+
+class CookieBrowser:
+    """
+    使用 Celery 和 Playwright 异步打开网页的浏览器类
+    """
+    def __init__(self):
+        """初始化 CookieBrowser"""
+        self.playwright = None
+        self.browser = None
+    
+    async def initialize(self):
+        """初始化 Playwright"""
+        self.playwright = await async_playwright().start()
+        self.browser = await self.playwright.chromium.launch(headless=False)
+    
+    async def close(self):
+        """关闭 Playwright"""
+        if self.browser:
+            await self.browser.close()
+        if self.playwright:
+            await self.playwright.stop()
+    
+    async def process_url(self, url):
+        """
+        处理单个 URL，异步打开网页并获取 cookie
+        
+        Args:
+            url: 要处理的 URL
+            
+        Returns:
+            Dict: 包含 URL 和 cookie 的字典
+        """
+        logger.info(f"Processing URL: {url}")
+        if not self.browser:
+            await self.initialize()
+        
+        page = await self.browser.new_page()
+        try:
+            await page.goto(url)
+            await page.wait_for_timeout(5000)  # 等待页面加载
+            
+            # 获取 cookie
+            cookies = await page.context.cookies()
+            cookie_str = '; '.join([f"{cookie['name']}={cookie['value']}" for cookie in cookies])
+            
+            # Windows兼容的时间戳获取方式
+            try:
+                timestamp = asyncio.get_event_loop().time()
+            except Exception:
+                import time
+                timestamp = time.time()
+            
+            return {
+                'url': url,
+                'cookie': cookie_str,
+                'timestamp': timestamp
+            }
+        finally:
+            await page.close()
+
+# 创建 CookieBrowser 实例
+cookie_browser = CookieBrowser()
+
+# 定义 Celery 任务
+@celery_app.task
+def process_url_task(url):
+    """
+    Celery 任务，处理单个 URL
+    
+    Args:
+        url: 要处理的 URL
+        
+    Returns:
+        Dict: 包含 URL 和 cookie 的字典
+    """
+    logger.info(f"Celery task processing URL: {url}")
+    
+    # Windows兼容的事件循环处理
+    if platform.system() == 'Windows':
+        # Windows下使用新的事件循环
+        try:
+            # 尝试关闭现有的事件循环（如果存在）
+            old_loop = asyncio.get_event_loop()
+            if not old_loop.is_closed():
+                old_loop.close()
+        except RuntimeError:
+            pass
+        
+        # 创建新的事件循环
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    else:
+        # Unix系统使用标准方式
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    
+    try:
+        result = loop.run_until_complete(cookie_browser.process_url(url))
+        return result
+    except Exception as e:
+        # Windows兼容的时间戳获取方式
+        try:
+            timestamp = loop.time()
+        except Exception:
+            import time
+            timestamp = time.time()
+        
+        return {
+            'url': url,
+            'error': str(e),
+            'timestamp': timestamp
+        }
+    finally:
+        # 确保关闭事件循环
+        try:
+            if not loop.is_closed():
+                loop.close()
+        except Exception:
+            pass
+
+if __name__ == "__main__":
+    # 设置日志
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+    
+    # 创建并启动工作进程
+    worker = CookieUpdater()
+    worker.start()

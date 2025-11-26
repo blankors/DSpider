@@ -12,8 +12,11 @@ RUN apt-get update -y --fix-missing && apt-get install -y --no-install-recommend
 # 复制依赖文件
 COPY master/requirements.txt .
 
+# 安装uv
+RUN pip install --no-cache-dir uv
+
 # 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt
+    RUN uv pip install --no-cache-dir --system -r requirements.txt
 
 # 复制代码
 COPY master/ .

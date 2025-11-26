@@ -3,7 +3,7 @@ import datetime
 from context import common
 from common.mongodb_client import MongoDBConnection, mongodb_conn
 data1 = {
-    "id": "1",
+    "id": "5",
     "jump_from_url": "",
     "hr_index_url": "",
     "state": 0,
@@ -46,7 +46,7 @@ if __name__ == '__main__':
     collection = mongodb_conn.get_collection(collection_name)
     
     # 插入数据，设置id为主键
-    # mongodb_conn.insert_one(collection_name, data1, {"id": "1"})
+    mongodb_conn.insert_one(collection_name, data1)
     
     # 查询数据
     # if collection is not None:

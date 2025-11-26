@@ -83,7 +83,7 @@ class MongoDBConnection:
             return None
         return self.db[collection_name]
     
-    def insert_one(self, collection_name: str, document: Dict[str, Any], options: Optional[Dict[str, Any]] = None) -> Optional[str]:
+    def insert_one(self, collection_name: str, document: Dict[str, Any]) -> Optional[str]:
         """插入单条文档
         
         Args:
@@ -95,8 +95,8 @@ class MongoDBConnection:
             str: 插入的文档ID，失败返回None
         """
         # 如果指定了_id，将其添加到文档中
-        if options and 'id' in options:
-            document['_id'] = options['id']
+        if 'id' in document:
+            document['_id'] = document['id']
         
         try:
             collection = self.get_collection(collection_name)

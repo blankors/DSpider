@@ -10,11 +10,17 @@ RUN apt-get update -y --fix-missing && apt-get install -y --no-install-recommend
     curl \
     && rm -rf /var/lib/apt/lists/*
 
+# 安装uv
+RUN pip install --no-cache-dir uv
+
 # 复制依赖文件
 COPY worker/requirements.txt .
 
 # 安装Python依赖
-RUN pip install --no-cache-dir -r requirements.txt
+RUN uv pip install --no-cache-dir --system -r requirements.txt
+
+# 安装Playwright浏览器
+RUN playwright install
 
 # 复制代码
 COPY worker/ .
@@ -29,4 +35,4 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # 运行命令
-CMD ["python", "worker.py"]
+CMD ["bash", "-c", "cd /app && celery -A common.celery_config worker --loglevel=info & python worker.py"]
