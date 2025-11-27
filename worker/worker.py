@@ -1,44 +1,33 @@
 import os
-import json
-import yaml
 import time
 import logging
 import requests
 from typing import Dict, Any, Optional
 import uuid
-import logging
 
 from common.rabbitmq_client import RabbitMQClient, rabbitmq_client
 from common.logger_config import LoggerConfig
-from worker.worker_config import worker_config
+from common.load_config import config
 
 class WorkerNode1:
     """爬虫Worker节点"""
     
-    def __init__(self, config_path: str = '../config/config.yaml', worker_id: Optional[str] = None):
+    def __init__(self, worker_id: Optional[str] = None):
         """初始化Worker节点
         
         Args:
-            config_path: 配置文件路径
             worker_id: 工作节点ID
         """
         # 先设置worker_id
         self.worker_id = worker_id or f'worker_{os.getpid()}'
         
-        # 先初始化基本的logger，不依赖配置
-        self.logger = LoggerConfig.setup_logger(
-            log_level=logging.INFO,
-            log_file=f'logs/worker_{self.worker_id}.log',
-            name=f'worker_{self.worker_id}'
-        )
+        # 使用common中的配置
+        self.config = config
         
-        # 然后加载配置
-        self.config = self._load_config(config_path)
-        
-        # 如果有日志配置，可以重新配置logger
-        # 尝试加载YAML格式的日志配置，如果不存在则尝试JSON格式
-        log_config_yaml = os.path.join(os.path.dirname(config_path), 'logging.yaml')
-        log_config_json = os.path.join(os.path.dirname(config_path), 'logging.json')
+        # 设置日志
+        # 尝试加载YAML格式的日志配置
+        log_config_yaml = 'config/logging.yaml'
+        log_config_json = 'config/logging.json'
         
         if os.path.exists(log_config_yaml):
             self.logger = LoggerConfig.setup_logger(
@@ -50,10 +39,8 @@ class WorkerNode1:
                 log_config_json, 
                 name=f'worker_{self.worker_id}'
             )
-        elif 'logging' in self.config:
+        else:
             self.logger = LoggerConfig.setup_logger(
-                log_level=logging.INFO,
-                log_file=f'logs/worker_{self.worker_id}.log',
                 name=f'worker_{self.worker_id}'
             )
         
@@ -73,40 +60,7 @@ class WorkerNode1:
         self.prefetch_count = self.config['worker']['prefetch_count']
         self.timeout = self.config['worker']['timeout']
     
-    def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """加载配置文件（支持YAML和JSON格式）
-        
-        Args:
-            config_path: 配置文件路径
-            
-        Returns:
-            Dict[str, Any]: 配置字典
-        """
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                if config_path.endswith('.yaml') or config_path.endswith('.yml'):
-                    return yaml.safe_load(f)
-                else:
-                    return json.load(f)
-        except Exception as e:
-            self.logger.error(f"加载配置文件失败: {str(e)}")
-            # 返回默认配置
-            return {
-                'rabbitmq': {
-                    'host': 'localhost',
-                    'port': 5672,
-                    'username': 'guest',
-                    'password': 'guest',
-                    'virtual_host': '/'
-                },
-                'worker': {
-                    'task_queue': 'spider_tasks',
-                    'result_exchange': 'spider_exchange',
-                    'result_routing_key': 'result',
-                    'prefetch_count': 5,
-                    'timeout': 300
-                }
-            }
+
     
     def initialize(self) -> bool:
         """初始化连接和资源
@@ -331,8 +285,8 @@ class WorkerNode:
     def __init__(self):
         self.worker_id = str(uuid.uuid4())[:8]
         self.rabbitmq_client = rabbitmq_client
-        self.queue_name = worker_config['queue_name']
-        self.prefetch_count = worker_config['prefetch_count']
+        self.queue_name = config['worker']['task_queue']
+        self.prefetch_count = config['worker'].get('prefetch_count', 1)  # 默认值为1
         self.logger = logging.getLogger(f"WorkerNode-{self.worker_id}")
     
     def run(self):

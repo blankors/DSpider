@@ -5,7 +5,6 @@
 2、RabbitMQ，用于任务分发，缓存爬取结果
 3、
 
-
 流程：
 1、Master节点从MongoDB的WebsiteConfig表中读取任务配置，将任务配置分发到RabbitMQ的任务队列中。
 2、每个爬虫节点作为一个独立的Docker容器，负责从RabbitMQ获取任务并执行网页抓取。
@@ -70,5 +69,14 @@
 
 请编写Dockerfile和docker-compose.yml文件，以便快速部署整个系统。同时，提供简要说明文档，介绍如何启动和停止各个服务，以及如何向系统中添加新的爬虫节点和数据处理节点。文档中需包含详细的命令行操作指南和注意事项。文档中应包括每个服务的启动命令、停止命令、日志查看命令等，并说明如何调整资源限制和网络设置。
 
-
 单独在一个文件中编写项目配置，区分开发、测试、上线环境（环境名词应当为dev、test、prod）。例如配置mongo、rabbitmq等组件的连接配置，需要确保能够连接相应的容器
+
+
+通过uv管理python依赖
+
+优化dockerfile中命令顺序，不要每次修改代码都要进行playwright install
+
+使用多阶段构建，减少容器体积
+
+
+让docker区分开发环境pip install -e .、生产环境pip install .

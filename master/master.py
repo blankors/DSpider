@@ -5,35 +5,28 @@ from typing import Dict, Any, List
 from common.mongodb_client import MongoDBConnection
 from common.rabbitmq_client import RabbitMQClient
 from common.logger_config import LoggerConfig
-from common.config_manager import load_config
+from common.load_config import config
 
 class MasterNode:
     """爬虫Master节点"""
     
-    def __init__(self, config_path: str = '../config/config.yaml'):
+    def __init__(self):
         """初始化Master节点
-        
-        Args:
-            config_path: 配置文件路径
         """
-        # 加载配置
-        self.config = self._load_config(config_path)
+        # 使用common中的配置
+        self.config = config
         
         # 设置日志
-        # 尝试加载YAML格式的日志配置，如果不存在则尝试JSON格式
-        log_config_yaml = os.path.join(os.path.dirname(config_path), 'logging.yaml')
-        log_config_json = os.path.join(os.path.dirname(config_path), 'logging.json')
+        # 尝试加载YAML格式的日志配置
+        log_config_yaml = 'config/logging.yaml'
+        log_config_json = 'config/logging.json'
         
         if os.path.exists(log_config_yaml):
             self.logger = LoggerConfig.setup_logger(log_config_yaml, name='master')
         elif os.path.exists(log_config_json):
             self.logger = LoggerConfig.setup_logger(log_config_json, name='master')
         else:
-            self.logger = LoggerConfig.setup_logger(
-                log_level=logging.INFO,
-                log_file=self.config.get('logging', {}).get('file', 'logs/master.log'),
-                name='master'
-            )
+            self.logger = LoggerConfig.setup_logger(name='master')
         
         # 初始化MongoDB连接
         self.mongo_client = MongoDBConnection(
@@ -59,17 +52,6 @@ class MasterNode:
         self.routing_key = self.config['master']['routing_key']
         self.task_batch_size = self.config['master']['task_batch_size']
         self.polling_interval = self.config['master']['polling_interval']
-    
-    def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """加载配置文件
-        
-        Args:
-            config_path: 配置文件路径
-            
-        Returns:
-            Dict[str, Any]: 配置字典
-        """
-        return load_config(config_path)
     
     def initialize(self) -> bool:
         """初始化连接和资源

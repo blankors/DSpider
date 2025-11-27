@@ -1,46 +1,32 @@
 import os
-import json
-import yaml
 import time
 import logging
 from typing import Dict, Any, List
 from common.mongodb_client import MongoDBConnection
 from common.rabbitmq_client import RabbitMQClient
 from common.logger_config import LoggerConfig
+from common.load_config import config
 
 class ProcessorNode:
     """数据处理节点"""
     
-    def __init__(self, config_path: str = '../config/config.yaml'):
+    def __init__(self):
         """初始化Processor节点
-        
-        Args:
-            config_path: 配置文件路径
         """
-        # 先初始化基本的logger，不依赖配置
-        self.logger = LoggerConfig.setup_logger(
-            log_level=logging.INFO,
-            log_file='logs/processor.log',
-            name='processor'
-        )
+        # 使用common中的配置
+        self.config = config
         
-        # 然后加载配置
-        self.config = self._load_config(config_path)
+        # 设置日志
+        # 尝试加载YAML格式的日志配置
+        log_config_yaml = 'config/logging.yaml'
+        log_config_json = 'config/logging.json'
         
-        # 如果有日志配置，可以重新配置logger
-        # 优先尝试YAML格式配置
-        log_config_path_yaml = os.path.join(os.path.dirname(config_path), 'logging.yaml')
-        if os.path.exists(log_config_path_yaml):
-            self.logger = LoggerConfig.setup_logger(log_config_path_yaml, name='processor')
-        # 其次尝试JSON格式配置
-        elif os.path.exists(os.path.join(os.path.dirname(config_path), 'logging.json')):
-            self.logger = LoggerConfig.setup_logger(os.path.join(os.path.dirname(config_path), 'logging.json'), name='processor')
-        elif 'logging' in self.config:
-            self.logger = LoggerConfig.setup_logger(
-                log_level=logging.INFO,
-                log_file=self.config.get('logging', {}).get('file', 'logs/processor.log'),
-                name='processor'
-            )
+        if os.path.exists(log_config_yaml):
+            self.logger = LoggerConfig.setup_logger(log_config_yaml, name='processor')
+        elif os.path.exists(log_config_json):
+            self.logger = LoggerConfig.setup_logger(log_config_json, name='processor')
+        else:
+            self.logger = LoggerConfig.setup_logger(name='processor')
         
         # 初始化MongoDB连接
         self.mongo_client = MongoDBConnection(
@@ -70,47 +56,7 @@ class ProcessorNode:
         # 批量处理缓存
         self.batch_cache: List[Dict[str, Any]] = []
     
-    def _load_config(self, config_path: str) -> Dict[str, Any]:
-        """加载配置文件
-        
-        Args:
-            config_path: 配置文件路径
-            
-        Returns:
-            Dict[str, Any]: 配置字典
-        """
-        try:
-            with open(config_path, 'r', encoding='utf-8') as f:
-                if config_path.endswith('.yaml') or config_path.endswith('.yml'):
-                    return yaml.safe_load(f)
-                else:
-                    return json.load(f)
-        except Exception as e:
-            self.logger.error(f"加载配置文件失败: {str(e)}")
-            # 返回默认配置
-            return {
-                'mongodb': {
-                    'host': 'localhost',
-                    'port': 27017,
-                    'username': '',
-                    'password': '',
-                    'db_name': 'spider_db'
-                },
-                'rabbitmq': {
-                    'host': 'localhost',
-                    'port': 5672,
-                    'username': 'guest',
-                    'password': 'guest',
-                    'virtual_host': '/'
-                },
-                'processor': {
-                    'result_queue': 'spider_results',
-                    'exchange_name': 'spider_exchange',
-                    'routing_key': 'result',
-                    'collection_name': 'spider_results',
-                    'batch_size': 50
-                }
-            }
+
     
     def initialize(self) -> bool:
         """初始化连接和资源
