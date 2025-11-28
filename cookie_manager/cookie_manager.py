@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 import asyncio
 
-from playwright.sync_api import sync_playwright
-
+from playwright_worker.worker import process_url_task
 from common.rabbitmq_client import rabbitmq_client
+from common.mongodb_client import mongodb_conn
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,18 +33,7 @@ class CookieUpdater:
         self.thread = None
         
         self.rabbitmq_client = rabbitmq_client
-        
-        # 注册信号处理器
-        dispatcher.connect(self.handle_spider_signal, signal="NEED_COOKIE", sender=dispatcher.Any)
-    
-    def start_v1(self):
-        """启动定时更新线程"""
-        # if not self.running:
-        #     self.running = True
-        #     self.thread = threading.Thread(target=self._periodic_update)
-        #     self.thread.daemon = True
-        #     self.thread.start()
-        #     print("CookieUpdater started")
+        self.mongodb_conn = mongodb_conn
     
     def stop(self):
         """停止定时更新"""
@@ -56,24 +45,17 @@ class CookieUpdater:
     
     def start(self):
         """定时批量更新cookie"""
-        self.rabbitmq_client.consume_messages(
-            queue_name='sql2mq',
-            callback=self._update_single_cookie
-        )
-        # while self.running:
-        #     try:
-        #         # 从数据库获取URL列表（这里用模拟数据）
-        #         urls = self._get_urls_from_db()
-        #         print(f"Updating cookies for {len(urls)} URLs")
-                
-        #         for url in urls:
-        #             self._update_single_cookie(url)
-                
-        #         print(f"Batch update completed at {datetime.now()}")
-        #         time.sleep(self.update_interval)
-        #     except Exception as e:
-        #         print(f"Error during periodic update: {e}")
-        #         time.sleep(60)  # 出错后等待1分钟再继续
+        # 定期扫描数据库，通过celery任务更新cookie
+        self.running = True
+        while self.running:
+            # 扫描数据库，获取所有需要更新的URL
+            urls = self.mongodb_conn.get_collection('cookies').find()
+            
+            for url_data in urls:
+                self._update_single_cookie(url_data, url_data)
+            
+            # 等待下一个更新周期
+            time.sleep(self.update_interval)
     
     def _update_single_cookie(self, data, properties: Dict[str, Any]):
         """
@@ -88,7 +70,6 @@ class CookieUpdater:
             logger.info(f"Received URL: {url}")
             
             # 调用 Celery 任务处理 URL
-            from .cookie_updater import process_url_task
             process_url_task.delay(url)
             logger.info(f"Submitted Celery task for URL: {url}")
             

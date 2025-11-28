@@ -1,14 +1,7 @@
-from celery import Celery
 import os
 import sys
 import platform
 from common.load_config import config
-
-# 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-# 创建 Celery 实例
-celery_app = Celery('DSpider')
 
 # 基础配置
 celery_config = {
@@ -31,9 +24,4 @@ if platform.system() == 'Windows':
         'worker_redirect_stdouts': False,
     })
 
-# 配置 Celery
-celery_app.conf.update(celery_config)
 
-# 自动发现任务
-# 修改任务发现路径以支持本地和Docker环境
-celery_app.autodiscover_tasks(['worker'])

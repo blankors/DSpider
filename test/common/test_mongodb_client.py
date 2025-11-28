@@ -40,13 +40,24 @@ data1 = {
     'update_time': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
 }
 
+# cookie data
+cookie_data = {
+    "id": "5",
+    "url": "https://zhaopin.jd.com/web/job/job_info_list/3",
+    "cookies": {
+        "JSESSIONID": "0D9E36EE88A43018AA117ECA03FAF083.s1"
+    }
+}
+
 if __name__ == '__main__':
-    mongodb_conn.connect()
     collection_name = "jd_config"
     collection = mongodb_conn.get_collection(collection_name)
     
+    cookie_collection = mongodb_conn.get_collection("cookies")
+    
     # 插入数据，设置id为主键
-    mongodb_conn.insert_one(collection_name, data1)
+    # mongodb_conn.insert_one(collection_name, data1)
+    cookie_collection.insert_one(cookie_data)
     
     # 查询数据
     # if collection is not None:
@@ -54,10 +65,10 @@ if __name__ == '__main__':
     #     print(data)
     
     # 查询status为0的前100条数据
-    if collection is not None:
-        data = collection.find({"state": 3}).limit(100)
-        for item in data:
-            print(item)
+    # if collection is not None:
+    #     data = collection.find({"state": 3}).limit(100)
+    #     for item in data:
+    #         print(item)
     
     # 删除集合
     # collection.drop()

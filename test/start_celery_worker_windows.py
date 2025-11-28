@@ -15,7 +15,7 @@ if platform.system() != 'Windows':
     sys.exit(1)
 
 # 添加项目根目录到Python路径
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # 设置环境变量以避免权限问题
 os.environ['FOR_DISABLE_CONSOLE_CTRL_HANDLER'] = '1'
@@ -27,7 +27,7 @@ def start_celery_worker():
     # 构建Celery worker启动命令
     command = [
         'celery',
-        '-A', 'common.celery_config',
+        '-A', 'playwright_worker.celery_app',
         'worker',
         '--loglevel=info',
         '--pool=solo',  # Windows必须使用solo池

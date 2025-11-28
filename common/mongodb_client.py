@@ -222,7 +222,7 @@ try:
         port=mongodb_config.get('port', 27017),
         username=mongodb_config.get('username', None),
         password=mongodb_config.get('password', None),
-        db_name=mongodb_config.get('db_name', 'spider_db')
+        db_name=mongodb_config.get('db_name', 'spider_db'),
     )
     mongodb_conn.connect()
 except Exception as e:
