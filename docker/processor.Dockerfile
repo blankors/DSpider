@@ -16,19 +16,15 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 # 复制依赖文件
-COPY pyproject.toml uv.lock ./
+COPY ../pyproject.toml ../uv.lock ./
 
 # 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式）
 RUN uv sync
 
 # 复制代码
-COPY processor/ .
+COPY ../src/dspider/ ./dspider
+COPY ../config/ ./config
 
-# 复制common目录
-COPY common/ ./common
-
-# 复制config目录
-COPY config/ ./config
 
 # 创建日志目录
 RUN mkdir -p /app/logs

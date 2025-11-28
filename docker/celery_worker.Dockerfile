@@ -30,7 +30,7 @@ RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:$PATH"
 
 # 复制项目配置和代码
-COPY pyproject.toml uv.lock ./
+COPY ../pyproject.toml ../uv.lock ./
 
 # 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式）
 RUN uv sync
@@ -39,9 +39,8 @@ RUN uv sync
 RUN uv run python -m playwright install
 
 # 复制代码
-COPY worker/ .
-COPY common /app/common
-COPY config /app/config
+COPY ../src/dspider/ ./dspider
+COPY ../config/ ./config
 
 # 创建日志目录
 RUN mkdir -p /app/logs
@@ -51,9 +50,8 @@ ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 
-# 启动Celery worker和worker.py，通过不同前缀区分日志
+# 只启动Celery worker，专注于处理任务
 CMD ["bash", "-c", \
     "cd /app && \
-    uv run celery -A common.celery_config worker --loglevel=info 2>&1 | sed 's/^/[CELERY] /' & \
-    uv run python worker.py 2>&1 | sed 's/^/[WORKER] /' & \
-    wait -n"]
+    uv run celery -A dspider.celery_worker.celery_app worker --loglevel=info 2>&1 | sed 's/^/[CELERY] /'" \
+]

@@ -438,7 +438,7 @@ wheels = [
 [[package]]
 name = "dspider"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "aio-pika" },
     { name = "celery" },
@@ -451,6 +451,11 @@ dependencies = [
     { name = "redis" },
     { name = "requests" },
     { name = "scrapy" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "dspider" },
 ]
 
 [package.metadata]
@@ -467,6 +472,9 @@ requires-dist = [
     { name = "requests", specifier = ">=2.32.5" },
     { name = "scrapy", specifier = ">=2.13.4" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "dspider", editable = "." }]
 
 [[package]]
 name = "exceptiongroup"

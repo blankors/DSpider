@@ -27,7 +27,7 @@ def start_celery_worker():
     # 构建Celery worker启动命令
     command = [
         'celery',
-        '-A', 'playwright_worker.celery_app',
+        '-A', 'dspider.celery_worker.celery_app',
         'worker',
         '--loglevel=info',
         '--pool=solo',  # Windows必须使用solo池

@@ -102,7 +102,7 @@ services:
   master:
     build:
       context: .
-      dockerfile: ./master/Dockerfile
+      dockerfile: ./docker/master.Dockerfile
     container_name: master
     restart: always
     depends_on:
@@ -121,13 +121,31 @@ services:
   worker:
     build:
       context: .
-      dockerfile: ./worker/Dockerfile
+      dockerfile: ./docker/worker.Dockerfile
     restart: always
     depends_on:
       rabbitmq:
         condition: service_healthy
     volumes:
       - ./logs/worker:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+    networks:
+      - spider_network
+
+  # Celery Worker节点
+  celery_worker:
+    build:
+      context: .
+      dockerfile: ./docker/celery_worker.Dockerfile
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+    volumes:
+      - ./logs/celery_worker:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
     networks:

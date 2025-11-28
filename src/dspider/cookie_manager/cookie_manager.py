@@ -7,9 +7,9 @@ from datetime import datetime, timedelta
 from typing import Any, Dict
 import asyncio
 
-from playwright_worker.worker import process_url_task
-from common.rabbitmq_client import rabbitmq_client
-from common.mongodb_client import mongodb_conn
+from dspider.celery_worker.tasks import process_url_task
+from dspider.common.rabbitmq_client import rabbitmq_client
+from dspider.common.mongodb_client import mongodb_conn
 import logging
 
 logger = logging.getLogger(__name__)

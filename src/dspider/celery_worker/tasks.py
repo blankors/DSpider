@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from playwright_worker.celery_app import celery_app
+from dspider.celery_worker.celery_app import celery_app
 from playwright.async_api import async_playwright
 import platform
 
