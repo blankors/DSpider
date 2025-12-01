@@ -7,7 +7,7 @@ from typing import Optional, Dict, Any, Callable, Union
 from pika.exceptions import ChannelClosedByBroker, ConnectionClosedByBroker, IncompatibleProtocolError, StreamLostError
 from pika import BasicProperties
 
-from common.load_config import config
+from dspider.common.load_config import config
 
 logger = logging.getLogger(__name__)
 
@@ -671,7 +671,7 @@ class AsyncRabbitMQClient:
             logger.error(f"消费消息时出错: {str(e)}")
 
 # 全局异步RabbitMQ客户端实例
-from common.load_config import config
+from dspider.common.load_config import config
 
 async_rabbitmq_client = AsyncRabbitMQClient(
     host=config['rabbitmq']['host'],

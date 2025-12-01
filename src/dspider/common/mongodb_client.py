@@ -3,7 +3,7 @@ import logging
 import time
 from typing import Optional, Dict, Any, List
 
-from common.load_config import config
+from dspider.common.load_config import config
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +27,6 @@ class MongoDBConnection:
         self.db_name = db_name
         self.client = None
         self.db = None
-        print(f"host: {self.host}, port: {self.port}, username: {self.username}, password: {self.password}, db_name: {self.db_name}")
     
     def connect(self, max_retries: int = 3, retry_delay: int = 2) -> bool:
         """连接到MongoDB

@@ -5,10 +5,10 @@ from typing import Dict, Any
 
 logger = logging.getLogger(__name__)
 
-env = os.getenv('dspider_env')
+default = 'test'
+env = os.getenv('dspider_env', default)
 if env is None:
-    logger.warning("环境变量 dspider_env 未设置，默认使用 dev 环境")
-    env = 'dev'
+    logger.warning(f"环境变量 dspider_env 未设置，默认使用 {default} 环境")
 
 def load_yaml(config_path: str) -> Dict[str, Any]:
     """加载YAML配置文件"""

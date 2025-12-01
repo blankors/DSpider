@@ -5,8 +5,8 @@ mongodb:
   password: admin123
   db_name: spider_db
 mysql:
-  host: localhost
-  port: 3307
+  host: mysql
+  port: 3306
   user: dspider
   password: dspider_password
   db: spider_db
@@ -19,7 +19,7 @@ rabbitmq:
   port: 5672
   username: admin
   password: admin123
-  vhost: /spider
+  virtual_host: /spider
 master:
   task_queue: spider_tasks
   exchange_name: spider_exchange
@@ -34,6 +34,9 @@ worker:
   heartbeat_interval: 30
 processor:
   result_queue: spider_results
+  exchange_name: spider_exchange
+  routing_key: result
+  collection_name: spider_data
   batch_size: 50
   processing_interval: 10
 logging:

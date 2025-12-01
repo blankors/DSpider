@@ -3,7 +3,8 @@ import sys
 import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-import common
+from src.dspider import common
+from src.dspider.common.mongodb_client import mongodb_conn, MongoDBConnection, mongodb_config
 
 logging.basicConfig(
     level=logging.INFO,

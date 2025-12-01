@@ -36,9 +36,11 @@ COPY ../src/ ./src
 COPY ../config/ ./config
 
 # 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式），使用国内镜像源加速下载
-RUN uv sync --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://pypi.org/simple/
+# RUN uv sync --index-url https://pypi.tuna.tsinghua.edu.cn/simple/ --extra-index-url https://pypi.org/simple/
+RUN uv sync
 
-# 安装Playwright浏览器
+# 安装Playwright依赖项和浏览器
+RUN uv run python -m playwright install-deps
 RUN uv run python -m playwright install
 
 # 创建日志目录
@@ -52,5 +54,5 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # 只启动Celery worker，专注于处理任务
 CMD ["bash", "-c", \
     "cd /app && \
-    uv run celery -A dspider.celery_worker.celery_app worker --loglevel=info 2>&1 | sed 's/^/[CELERY] /'" \
+    uv run celery -A dspider.celery_worker.celery_app worker --loglevel=info" \
 ]

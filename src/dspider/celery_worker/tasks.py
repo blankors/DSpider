@@ -19,6 +19,7 @@ class CookieBrowser:
     
     async def initialize(self):
         """初始化 Playwright"""
+        logger.info("Initializing Playwright...???")
         self.playwright = await async_playwright().start()
         self.browser = await self.playwright.chromium.launch(headless=False)
     

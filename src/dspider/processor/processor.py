@@ -2,10 +2,10 @@ import os
 import time
 import logging
 from typing import Dict, Any, List
-from common.mongodb_client import MongoDBConnection
-from common.rabbitmq_client import RabbitMQClient
-from common.logger_config import LoggerConfig
-from common.load_config import config
+from dspider.common.mongodb_client import MongoDBConnection
+from dspider.common.rabbitmq_client import RabbitMQClient
+from dspider.common.logger_config import LoggerConfig
+from dspider.common.load_config import config
 
 class ProcessorNode:
     """数据处理节点"""

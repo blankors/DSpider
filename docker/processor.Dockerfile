@@ -34,4 +34,4 @@ ENV PYTHONPATH=/app
 ENV PYTHONDONTWRITEBYTECODE=1
 
 # 使用uv run在虚拟环境中启动程序
-CMD ["uv", "run", "python", "processor.py"]
+CMD ["uv", "run", "python", "src/dspider/processor/processor.py"]

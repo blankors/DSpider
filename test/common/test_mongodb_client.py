@@ -1,7 +1,19 @@
 import datetime
 
-from context import common
-from common.mongodb_client import MongoDBConnection, mongodb_conn
+from context import mongodb_conn, MongoDBConnection, mongodb_config
+
+try:
+    mongodb_conn = MongoDBConnection(
+        host='localhost',
+        port=mongodb_config.get('port', 27017),
+        username=mongodb_config.get('username', None),
+        password=mongodb_config.get('password', None),
+        db_name=mongodb_config.get('db_name', 'spider_db'),
+    )
+    mongodb_conn.connect()
+except Exception as e:
+    print(f"MongoDB连接失败: {str(e)}")
+
 data1 = {
     "id": "5",
     "jump_from_url": "",
@@ -42,8 +54,8 @@ data1 = {
 
 # cookie data
 cookie_data = {
-    "id": "5",
-    "url": "https://zhaopin.jd.com/web/job/job_info_list/3",
+    "id": "11",
+    "url": "https://zhaopin.jd.com/web/job/job_info_list/11",
     "cookies": {
         "JSESSIONID": "0D9E36EE88A43018AA117ECA03FAF083.s1"
     }
@@ -69,6 +81,8 @@ if __name__ == '__main__':
     #     data = collection.find({"state": 3}).limit(100)
     #     for item in data:
     #         print(item)
+    print(cookie_collection.find_one())
     
     # 删除集合
     # collection.drop()
+    # cookie_collection.drop()

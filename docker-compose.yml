@@ -1,3 +1,25 @@
+# 开发环境监控配置
+x-develop:
+  watch:
+    # 所有服务通用监控规则
+    - action: sync
+      path: ./src
+      target: /app/src
+    - action: restart
+      path: ./src
+    - action: sync
+      path: ./config
+      target: /app/config
+    - action: restart
+      path: ./config
+    # 只有修改Dockerfile或依赖时才重建
+    - action: rebuild
+      path: ./docker
+    - action: rebuild
+      path: ./pyproject.toml
+    - action: rebuild
+      path: ./uv.lock
+
 services:
   # MongoDB服务
   mongodb:
@@ -87,11 +109,25 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
+      - ./src:/app/src
+      - ./config:/app/config
       - ./logs/master:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
     networks:
       - spider_network
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: restart
+          path: ./src
+        - action: sync
+          path: ./config
+          target: /app/config
+        - action: restart
+          path: ./config
 
   # Worker节点（可以扩展多个）
   worker:
@@ -103,11 +139,25 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
+      - ./src:/app/src
+      - ./config:/app/config
       - ./logs/worker:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
     networks:
       - spider_network
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: restart
+          path: ./src
+        - action: sync
+          path: ./config
+          target: /app/config
+        - action: restart
+          path: ./config
 
   # Celery Worker节点
   celery_worker:
@@ -121,11 +171,25 @@ services:
       mongodb:
         condition: service_healthy
     volumes:
+      - ./src:/app/src
+      - ./config:/app/config
       - ./logs/celery_worker:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
     networks:
       - spider_network
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: restart
+          path: ./src
+        - action: sync
+          path: ./config
+          target: /app/config
+        - action: restart
+          path: ./config
 
   # Processor节点
   processor:
@@ -140,11 +204,26 @@ services:
       rabbitmq:
         condition: service_healthy
     volumes:
+      - ./src:/app/src
+      - ./config:/app/config
       - ./logs/processor:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
     networks:
       - spider_network
+    develop:
+      watch:
+        - action: sync
+          path: ./src
+          target: /app/src
+        - action: restart
+          path: ./src
+        - action: sync
+          path: ./config
+          target: /app/config
+          
+        - action: restart
+          path: ./config
 
 volumes:
   mongo_data:

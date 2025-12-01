@@ -52,5 +52,5 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # 启动Celery worker和worker.py，通过不同前缀区分日志
 CMD ["bash", "-c", \
     "cd /app && \
-    uv run python dspider/worker/worker.py & \
+    uv run python src/dspider/worker/worker.py & \
     wait -n"]
