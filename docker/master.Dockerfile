@@ -17,13 +17,12 @@ ENV PATH="/root/.local/bin:$PATH"
 
 # 复制项目配置和代码
 COPY ../pyproject.toml ../uv.lock ./
-
-# 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式）
-RUN uv sync
-
-# 复制代码
-COPY ../src/dspider/ ./dspider
+COPY ../README.md ./
+COPY ../src/ ./src
 COPY ../config/ ./config
+
+# 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式），使用国内镜像源加速下载
+RUN uv sync --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://pypi.org/simple/
 
 # 创建日志目录
 RUN mkdir -p /app/logs

@@ -5,9 +5,9 @@ import requests
 from typing import Dict, Any, Optional
 import uuid
 
-from common.rabbitmq_client import RabbitMQClient, rabbitmq_client
-from common.logger_config import LoggerConfig
-from common.load_config import config
+from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
+from dspider.common.logger_config import LoggerConfig
+from dspider.common.load_config import config
 
 class WorkerNode1:
     """爬虫Worker节点"""

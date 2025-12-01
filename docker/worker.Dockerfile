@@ -31,16 +31,15 @@ ENV PATH="/root/.local/bin:$PATH"
 
 # 复制项目配置和代码
 COPY ../pyproject.toml ../uv.lock ./
+COPY ../README.md ./
+COPY ../src/ ./src
+COPY ../config/ ./config
 
-# 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式）
-RUN uv sync
+# 使用uv sync创建虚拟环境并安装依赖（包括可编辑模式），使用国内镜像源加速下载
+RUN uv sync --index-url https://mirrors.aliyun.com/pypi/simple/ --extra-index-url https://pypi.org/simple/
 
 # 安装Playwright浏览器
 RUN uv run python -m playwright install
-
-# 复制代码
-COPY ../src/dspider/ ./dspider
-COPY ../config/ ./config
 
 # 创建日志目录
 RUN mkdir -p /app/logs
@@ -53,6 +52,5 @@ ENV PYTHONDONTWRITEBYTECODE=1
 # 启动Celery worker和worker.py，通过不同前缀区分日志
 CMD ["bash", "-c", \
     "cd /app && \
-    uv run celery -A dspider.celery_worker.celery_app worker --loglevel=info 2>&1 | sed 's/^/[CELERY] /' & \
-    uv run python dspider/worker/worker.py 2>&1 | sed 's/^/[WORKER] /' & \
+    uv run python dspider/worker/worker.py & \
     wait -n"]

@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   # MongoDB服务
   mongodb:
-    image: mongo:5.0
+    image: mongo:latest
     container_name: mongodb
     restart: always
     volumes:
@@ -14,9 +12,16 @@ services:
       - MONGO_INITDB_ROOT_USERNAME=admin
       - MONGO_INITDB_ROOT_PASSWORD=admin123
       - MONGO_INITDB_DATABASE=spider_db
-    command: mongod --auth
     healthcheck:
-      test: ["CMD", "mongo", "-u", "admin", "-p", "admin123", "--authenticationDatabase", "admin", "--eval", "db.adminCommand('ping')"]
+      test: >
+        mongosh
+        --username admin
+        --password admin123
+        --authenticationDatabase admin
+        --host 127.0.0.1
+        --port 27017
+        --eval 'db.adminCommand("ping")'
+        --quiet
       interval: 30s
       timeout: 10s
       retries: 3
@@ -29,7 +34,6 @@ services:
     container_name: mysql
     restart: always
     volumes:
-      - ./data/mysql_data:/var/lib/mysql
       - mysql_data:/var/lib/mysql
     ports:
       - "3307:3306"
@@ -68,35 +72,7 @@ services:
     networks:
       - spider_network
 
-  # 初始化脚本（创建用户和虚拟主机）
-  rabbitmq-init:
-    image: rabbitmq:3.12-management
-    container_name: rabbitmq-init
-    depends_on:
-      rabbitmq:
-        condition: service_healthy
-    entrypoint: bash -c "
-      sleep 5 && 
-      rabbitmqadmin -u admin -p admin123 -V /spider declare exchange name=spider_exchange type=direct durable=true &&
-      rabbitmqadmin -u admin -p admin123 -V /spider declare queue name=spider_tasks durable=true &&
-      rabbitmqadmin -u admin -p admin123 -V /spider declare queue name=spider_results durable=true &&
-      rabbitmqadmin -u admin -p admin123 -V /spider declare binding source=spider_exchange destination=spider_tasks routing_key=task &&
-      rabbitmqadmin -u admin -p admin123 -V /spider declare binding source=spider_exchange destination=spider_results routing_key=result"
-    networks:
-      - spider_network
 
-  # MongoDB初始化脚本（创建索引等）
-  mongodb-init:
-    image: mongo:5.0
-    container_name: mongodb-init
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    volumes:
-      - ./data/init_mongo.js:/docker-entrypoint-initdb.d/init_mongo.js
-    entrypoint: bash -c "mongo -u admin -p admin123 --authenticationDatabase admin spider_db /docker-entrypoint-initdb.d/init_mongo.js"
-    networks:
-      - spider_network
 
   # Master节点
   master:
@@ -155,7 +131,7 @@ services:
   processor:
     build:
       context: .
-      dockerfile: ./processor/Dockerfile
+      dockerfile: ./docker/processor.Dockerfile
     container_name: processor
     restart: always
     depends_on:
