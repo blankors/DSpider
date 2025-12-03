@@ -1,4 +1,6 @@
 import datetime
+import sys
+import requests
 
 from context import mongodb_conn, MongoDBConnection, mongodb_config
 
@@ -23,7 +25,7 @@ data1 = {
     'api_url': '',
     'need_headers': False,
     'request_params': {
-        'url': "https://zhaopin.jd.com/web/job/job_list",
+        'api_url': "https://zhaopin.jd.com/web/job/job_list",
         'headers': {
             "referer": "https://zhaopin.jd.com/web/job/job_info_list/3"
         },
@@ -54,35 +56,56 @@ data1 = {
 
 # cookie data
 cookie_data = {
-    "id": "11",
-    "url": "https://zhaopin.jd.com/web/job/job_info_list/11",
+    "id": "1",
+    "url": "https://zhaopin.jd.com/web/job/job_info_list/3",
     "cookies": {
         "JSESSIONID": "0D9E36EE88A43018AA117ECA03FAF083.s1"
     }
 }
 
 if __name__ == '__main__':
-    collection_name = "jd_config"
-    collection = mongodb_conn.get_collection(collection_name)
+    # 获取命令行参数
+    action = ""
+    collection_name_list = ["jd_config", "cookies", "recruitment_datasource_config"]
+    collection_idx = 2
+    if len(sys.argv) > 1:
+        action = sys.argv[1]
+        if len(sys.argv) > 2:
+            collection_idx = sys.argv[2]
+            
+    collection = mongodb_conn.get_collection(collection_name_list[collection_idx])
     
-    cookie_collection = mongodb_conn.get_collection("cookies")
+    if action == "add":
+        # 插入数据，设置id为主键
+        # mongodb_conn.insert_one(collection_name, data1)
+        # cookie_collection.insert_one(cookie_data)
+        collection.insert_one(data1)
     
-    # 插入数据，设置id为主键
-    # mongodb_conn.insert_one(collection_name, data1)
-    cookie_collection.insert_one(cookie_data)
     
+    # 删除集合
+    if action == "rm":
+        collection.drop()
+        collection.drop()
+
     # 查询数据
     # if collection is not None:
     #     data = collection.find_one({"id": "1"})
     #     print(data)
     
     # 查询status为0的前100条数据
-    # if collection is not None:
-    #     data = collection.find({"state": 3}).limit(100)
-    #     for item in data:
-    #         print(item)
-    print(cookie_collection.find_one())
-    
-    # 删除集合
-    # collection.drop()
-    # cookie_collection.drop()
+    # data = collection.find({"state": 3}).limit(100)
+    data = collection.find()
+    for item in data:
+        print(item)
+        api_url = item['request_params']['api_url']
+        headers = item['request_params']['headers']
+        print(headers)
+        data = {
+            'pageIndex': '1',
+            'pageSize': '10',
+            'workCityJson': '[]',
+            'jobTypeJson': '[]',
+            'jobSearch': '',
+        }
+        response = requests.post('https://zhaopin.jd.com/web/job/job_list', headers=headers, data=data)
+        print(response.text)

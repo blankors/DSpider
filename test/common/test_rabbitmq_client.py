@@ -2,7 +2,7 @@
 from context import common
 import unittest
 from unittest.mock import patch, MagicMock
-from common.rabbitmq_client import RabbitMQClient
+from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
 
 class TestRabbitMQClient(unittest.TestCase):
     """RabbitMQ客户端的单元测试"""
@@ -63,6 +63,7 @@ if __name__ == '__main__':
     # 运行单元测试
     # unittest.main()
     
-    # 测试实际连接
-    from common.rabbitmq_client import rabbitmq_client
-    rabbitmq_client.connect()
+    # 查询队列消息数量
+    queue_name = 'test_queue'
+    message_count = rabbitmq_client.get_queue_message_count(queue_name)
+    print(f"队列 {queue_name} 中的消息数量: {message_count}")
