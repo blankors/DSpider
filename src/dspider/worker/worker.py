@@ -10,6 +10,7 @@ import requests
 from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
+from dspider.common.minio_client import minio_client
 
 class WorkerNodeByLLM:
     """爬虫Worker节点"""
@@ -294,6 +295,35 @@ class WorkerNode:
             prefetch_count=self.prefetch_count
         )
     
+    def store_to_minio(self, task_id: str, content: str, bucket_name: str = "spider-results") -> bool:
+        """将内容存储到MinIO
+        
+        Args:
+            task_id: 任务ID
+            content: 要存储的内容
+            bucket_name: 存储桶名称
+            
+        Returns:
+            bool: 是否成功存储
+        """
+        try:
+            # 生成唯一的对象名称
+            import datetime
+            object_name = f"{datetime.datetime.now().strftime('%Y/%m/%d')}/{task_id}.txt"
+            
+            # 存储到MinIO
+            success = minio_client.upload_text(bucket_name, object_name, content)
+            print(success)
+            if success:
+                self.logger.info(f"[{self.worker_id}] 成功将任务 {task_id} 的结果存储到MinIO: {object_name}")
+            else:
+                self.logger.error(f"[{self.worker_id}] 存储任务 {task_id} 的结果到MinIO失败")
+            
+            return success
+        except Exception as e:
+            self.logger.error(f"[{self.worker_id}] 存储到MinIO时发生错误: {str(e)}")
+            return False
+    
     def process_task(self, task: Dict[str, Any], properties: Dict[str, Any]) -> bool:
         """处理单个任务
         
@@ -304,41 +334,24 @@ class WorkerNode:
         Returns:
             bool: 是否成功处理
         """
-        self.logger.info(f"[{self.worker_id}] 收到任务: {task.get('_id', 'unknown')}")
+        task_id = task.get('_id', str(uuid.uuid4()))
+        self.logger.info(f"[{self.worker_id}] 收到任务: {task_id}")
         print(task)
         try:
             request_params = task['request_params']
             api_url, headers, postdata = request_params['api_url'], request_params['headers'], request_params['data']
             resp = requests.post(api_url, headers=headers, data=postdata)
-            print(resp.text)
+            
+            # 将响应内容存储到MinIO
+            self.store_to_minio(task_id, resp.text)
         except KeyError as e:
             self.logger.error(f"[{self.worker_id}] 任务缺少必要字段: {str(e)}")
             return False
+        except Exception as e:
+            self.logger.error(f"[{self.worker_id}] 处理任务时发生错误: {str(e)}")
+            return False
         time.sleep(100)
         return False
-        try:
-            print(task)
-            # 执行抓取
-            # fetch_result = self.fetch_url(task)
-            
-            # 解析结果
-            # final_result = self.parse_response(task, fetch_result)
-            
-            # 发送结果到RabbitMQ
-            # if self.rabbitmq_client.publish_message(
-            #     self.result_exchange,
-            #     self.result_routing_key,
-            #     final_result
-            # ):
-            #     self.logger.info(f"[{self.worker_id}] 结果已发送: {task.get('_id', 'unknown')}")
-            #     return True
-            # else:
-            #     self.logger.error(f"[{self.worker_id}] 结果发送失败: {task.get('_id', 'unknown')}")
-            #     return False
-                
-        except Exception as e:
-            self.logger.error(f"[{self.worker_id}] 处理任务时出错: {str(e)}")
-            return False
 
 if __name__ == '__main__':
     worker = WorkerNode()
