@@ -16,7 +16,7 @@ try:
 except Exception as e:
     print(f"MongoDB连接失败: {str(e)}")
 
-data1 = {
+config_data = {
     "id": "5",
     "jump_from_url": "",
     "hr_index_url": "",
@@ -77,10 +77,13 @@ if __name__ == '__main__':
     
     if action == "add":
         # 插入数据，设置id为主键
-        # mongodb_conn.insert_one(collection_name, data1)
+        # mongodb_conn.insert_one(collection_name, config_data)
         # cookie_collection.insert_one(cookie_data)
-        collection.insert_one(data1)
+        collection.insert_one(config_data)
     
+    if action == "u":
+        # 更新数据。更新id为5的配置，将state设置为1
+        collection.update_one({"id": "5"}, {"$set": {"state": 1}})
     
     # 删除集合
     if action == "rm":
@@ -97,15 +100,18 @@ if __name__ == '__main__':
     data = collection.find()
     for item in data:
         print(item)
+        
         api_url = item['request_params']['api_url']
         headers = item['request_params']['headers']
-        print(headers)
-        data = {
-            'pageIndex': '1',
-            'pageSize': '10',
-            'workCityJson': '[]',
-            'jobTypeJson': '[]',
-            'jobSearch': '',
-        }
-        response = requests.post('https://zhaopin.jd.com/web/job/job_list', headers=headers, data=data)
-        print(response.text)
+        data = item['request_params']['data']
+        
+        # data = {
+        #     'pageIndex': '1',
+        #     'pageSize': '10',
+        #     'workCityJson': '[]',
+        #     'jobTypeJson': '[]',
+        #     'jobSearch': '',
+        # }
+        # response = requests.post('https://zhaopin.jd.com/web/job/job_list', headers=headers, data=data) # 仅校验header是否正确
+        # response = requests.post(api_url, headers=headers, data=data)
+        # print(response.text)

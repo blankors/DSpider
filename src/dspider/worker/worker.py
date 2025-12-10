@@ -5,11 +5,13 @@ import requests
 from typing import Dict, Any, Optional
 import uuid
 
+import requests
+
 from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
 
-class WorkerNode1:
+class WorkerNodeByLLM:
     """爬虫Worker节点"""
     
     def __init__(self, worker_id: Optional[str] = None):
@@ -45,13 +47,7 @@ class WorkerNode1:
             )
         
         # 初始化RabbitMQ连接
-        self.rabbitmq_client = RabbitMQClient(
-            host=self.config['rabbitmq']['host'],
-            port=self.config['rabbitmq']['port'],
-            username=self.config['rabbitmq']['username'],
-            password=self.config['rabbitmq']['password'],
-            virtual_host=self.config['rabbitmq']['virtual_host']
-        )
+        self.rabbitmq_client = rabbitmq_client
         
         # 任务配置
         self.task_queue = self.config['worker']['task_queue']
@@ -285,7 +281,8 @@ class WorkerNode:
     def __init__(self):
         self.worker_id = str(uuid.uuid4())[:8]
         self.rabbitmq_client = rabbitmq_client
-        self.queue_name = config['worker']['task_queue']
+        # self.queue_name = config['worker']['task_queue']
+        self.queue_name = 'sql2mq'
         self.prefetch_count = config['worker'].get('prefetch_count', 1)  # 默认值为1
         self.logger = logging.getLogger(f"WorkerNode-{self.worker_id}")
     
@@ -309,7 +306,15 @@ class WorkerNode:
         """
         self.logger.info(f"[{self.worker_id}] 收到任务: {task.get('_id', 'unknown')}")
         print(task)
-        time.sleep(10)
+        try:
+            request_params = task['request_params']
+            api_url, headers, postdata = request_params['api_url'], request_params['headers'], request_params['data']
+            resp = requests.post(api_url, headers=headers, data=postdata)
+            print(resp.text)
+        except KeyError as e:
+            self.logger.error(f"[{self.worker_id}] 任务缺少必要字段: {str(e)}")
+            return False
+        time.sleep(100)
         return False
         try:
             print(task)

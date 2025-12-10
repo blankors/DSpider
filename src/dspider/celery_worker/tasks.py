@@ -92,8 +92,10 @@ class CookieBrowser:
         finally:
             await page.close()
 
-# 创建 CookieBrowser 实例
-cookie_browser = CookieBrowser()
+# Celery 默认使用 prefork 池（基于 billiard，即 multiprocessing 的增强版） 来实现并发。其核心机制就是 主进程 fork 多个子工作进程。
+# 主进程创建 CookieBrowser， fork 后，每个子进程拥有该连接的副本
+# 多进程公用一个 CookieBrowser 实例
+# cookie_browser = CookieBrowser()
 
 # 定义 Celery 任务
 @celery_app.task
@@ -108,6 +110,7 @@ def process_url_task(data: dict):
         Dict: 包含 URL 和 cookie 的字典
     """
     logger.info(f"Celery task processing URL: {data['url']}")
+    cookie_browser = CookieBrowser()
     cookie_browser.set_datasource_config(data)
     
     # Windows兼容的事件循环处理
