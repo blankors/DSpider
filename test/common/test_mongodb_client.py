@@ -83,7 +83,11 @@ if __name__ == '__main__':
     
     if action == "u":
         # 更新数据。更新id为5的配置，将state设置为1
-        collection.update_one({"id": "5"}, {"$set": {"state": 1}})
+        # collection.update_one({"id": "5"}, {"$set": {"state": 1}})
+        # 设置request_params.data字段为空字典
+        collection.update_one({"id": "5"}, {"$set": {"request_params.data": {}}})
+        # 删除request_params.data字段
+        # collection.update_one({"id": "5"}, {"$unset": {"request_params.data": ""}})
     
     # 删除集合
     if action == "rm":
@@ -104,6 +108,9 @@ if __name__ == '__main__':
         api_url = item['request_params']['api_url']
         headers = item['request_params']['headers']
         data = item['request_params']['data']
+        print(f'type(api_url): {type(api_url)}, type(headers): {type(headers)}, type(data): {type(data)}')
+        print(f'api_url: {api_url}, headers: {headers}, data: {data}')
+        
         
         # data = {
         #     'pageIndex': '1',

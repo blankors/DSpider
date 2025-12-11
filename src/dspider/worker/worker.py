@@ -11,6 +11,35 @@ from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
 from dspider.common.minio_client import minio_client
+from dspider.worker.list_spider import ListSpider
+
+# 配置日志系统
+logging_config = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - %(name)s - %(levelname)s - %(message)s - %(process)d - %(thread)d - %(filename)s - %(lineno)d - %(funcName)s'
+        }
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'level': 'INFO',
+            'formatter': 'standard',
+            'stream': 'ext://sys.stdout'
+        }
+    },
+    'loggers': {
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True
+        }
+    }
+}
+
+logging.config.dictConfig(logging_config)
 
 class WorkerNodeByLLM:
     """爬虫Worker节点"""
@@ -286,6 +315,7 @@ class WorkerNode:
         self.queue_name = 'sql2mq'
         self.prefetch_count = config['worker'].get('prefetch_count', 1)  # 默认值为1
         self.logger = logging.getLogger(f"WorkerNode-{self.worker_id}")
+        self.spider = ListSpider()
     
     def run(self):
         self.rabbitmq_client.consume_messages(
@@ -336,20 +366,7 @@ class WorkerNode:
         """
         task_id = task.get('_id', str(uuid.uuid4()))
         self.logger.info(f"[{self.worker_id}] 收到任务: {task_id}")
-        print(task)
-        try:
-            request_params = task['request_params']
-            api_url, headers, postdata = request_params['api_url'], request_params['headers'], request_params['data']
-            resp = requests.post(api_url, headers=headers, data=postdata)
-            
-            # 将响应内容存储到MinIO
-            self.store_to_minio(task_id, resp.text)
-        except KeyError as e:
-            self.logger.error(f"[{self.worker_id}] 任务缺少必要字段: {str(e)}")
-            return False
-        except Exception as e:
-            self.logger.error(f"[{self.worker_id}] 处理任务时发生错误: {str(e)}")
-            return False
+        self.spider.start(task)
         time.sleep(100)
         return False
 
