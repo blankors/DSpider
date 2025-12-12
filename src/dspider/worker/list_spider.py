@@ -64,24 +64,28 @@ class ListSpider:
         statistic = {
             'stop_reason': ''
         }
+        
+        last_fail = -1
+        last_resp_text = ''
         while True:
             if page_filed['location'] == 'api_url':
                 api_url = api_url.format(cur)
             elif page_filed['location'] == 'postdata':
                 postdata[page_filed['key']] = postdata_template[page_filed['key']].format(cur)
             resp = requests.request(req_method, api_url, headers=headers, data=postdata)
-            print(page_filed)
             print(cur, resp.status_code, resp.text[-50:])
             statistic['total'] = statistic.get('total', 0) + 1
-            last_fail = -1
             if statistic.get('fail'):
                 last_fail = statistic.get('fail')[-1]
             if resp.status_code == 200:
                 statistic['success'] = statistic.get('success', 0) + 1
+                if resp.text == last_resp_text:
+                    statistic['stop_reason'] = f"重复页响应内容，最后成功页：{cur}"
+                    break
+                last_resp_text = resp.text
             else:
                 if last_fail + step == cur: # 有连续页面请求失败
-                    print(f"[{task_id}] 连续{step}页请求失败，最后失败页：{last_fail}")
-                    statistic['stop_reason'] = f"连续{step}页请求失败，最后失败页：{last_fail}"
+                    statistic['stop_reason'] = f"连续页请求失败，最后失败页：{cur}"
                     break
                 if statistic.get('fail'):
                     statistic['fail'].append(cur)
