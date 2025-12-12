@@ -311,6 +311,7 @@ class WorkerNode:
     def __init__(self):
         self.worker_id = str(uuid.uuid4())[:8]
         self.rabbitmq_client = rabbitmq_client
+        self.minio_client = minio_client
         # self.queue_name = config['worker']['task_queue']
         self.queue_name = 'sql2mq'
         self.prefetch_count = config['worker'].get('prefetch_count', 1)  # 默认值为1
@@ -324,36 +325,7 @@ class WorkerNode:
             auto_ack=False,
             prefetch_count=self.prefetch_count
         )
-    
-    def store_to_minio(self, task_id: str, content: str, bucket_name: str = "spider-results") -> bool:
-        """将内容存储到MinIO
-        
-        Args:
-            task_id: 任务ID
-            content: 要存储的内容
-            bucket_name: 存储桶名称
-            
-        Returns:
-            bool: 是否成功存储
-        """
-        try:
-            # 生成唯一的对象名称
-            import datetime
-            object_name = f"{datetime.datetime.now().strftime('%Y/%m/%d')}/{task_id}.txt"
-            
-            # 存储到MinIO
-            success = minio_client.upload_text(bucket_name, object_name, content)
-            print(success)
-            if success:
-                self.logger.info(f"[{self.worker_id}] 成功将任务 {task_id} 的结果存储到MinIO: {object_name}")
-            else:
-                self.logger.error(f"[{self.worker_id}] 存储任务 {task_id} 的结果到MinIO失败")
-            
-            return success
-        except Exception as e:
-            self.logger.error(f"[{self.worker_id}] 存储到MinIO时发生错误: {str(e)}")
-            return False
-    
+
     def process_task(self, task: Dict[str, Any], properties: Dict[str, Any]) -> bool:
         """处理单个任务
         

@@ -23,9 +23,28 @@ jd_config = {
             'index_postdata': {}
         }
     },
-    'pagination': [394,1],
+    'pagination': [397,1],
     'parse_rule': {
         'url_rule'
     },
-    'round': 0
+    'schedule': {
+        # 'round_datetime': 0,
+        'interval': 10
+    }
+}
+jd_round = {
+    'id': '',
+    'jd_config_id': '',
+    'round': 1, # 什么情况作为一轮，由于数据异常的重试要算作一轮吗？
+    
+}
+list_ = {
+    'page': 1, # 列表的第n页
+               # 实际页码还是页码参数
+    'file_path': '',
+    
+}
+detail_ = {
+    'in_page': 2, # 在列表的第几页
+    'round': 1
 }
