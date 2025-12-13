@@ -1,13 +1,18 @@
 import logging
 import uuid
 import time
+import typing
+import datetime
 
 import requests
 
 from dspider.worker.judge_requests_method import ReqMethodHasPostJudger
 
+if typing.TYPE_CHECKING:
+    from dspider.worker.worker import WorkerNode
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+
 
 class PaginationGetter:
     """
@@ -40,11 +45,13 @@ class PaginationGetterDefault(PaginationGetter):
         return task['pagination']
     
 class ListSpider:
-    def __init__(self, executor):
+    def __init__(self, executor: 'WorkerNode'):
         self.executor = executor
+        self.mongodb_service = executor.mongodb_service
         self.minio_client = executor.minio_client
         self.req_method_judger = ReqMethodHasPostJudger()
         self.pagination_getter = PaginationGetterDefault()
+        self.logger = logging.getLogger(__name__)
     
     def start(self, task: dict):
         task_id = task.get('_id', str(uuid.uuid4()))
@@ -76,17 +83,33 @@ class ListSpider:
             elif page_filed['location'] == 'postdata':
                 postdata[page_filed['key']] = postdata_template[page_filed['key']].format(cur)
             
-            result = self.single_request(cur, step, api_url, headers, postdata, req_method, statistic)
-            continue_, resp = result
-            save_success = self.save()
+            resp = self.single_request(cur, step, api_url, headers, postdata, req_method, statistic)
             
-            if not continue_:
-                print(statistic)
+            if not resp:
                 break
+            else:
+                save_info = self.get_save_info(task, resp.text)
+                self.store_to_minio(save_info['filepath'], resp.text)
+                save_success = self.save(save_info['filepath'])
             
             cur += step
             time.sleep(5)
 
+    def get_save_info(self, task, resp_text):
+        """ 
+        输入：任务信息+响应信息
+        输出：
+        
+        :param task: 任务字典
+        :return: None
+        """
+        task_id = task.get('_id', str(uuid.uuid4()))
+        import hashlib
+        md5 = hashlib.md5(resp_text.encode('utf-8')).hexdigest()
+        filepath = f"{datetime.datetime.now().strftime('%Y/%m/%d')}/{task_id}_{md5}.txt" # 示例：2023/08/25/123456.txt
+        return {
+            'filepath': filepath
+        }
 
     def single_request(self, cur, step, api_url, headers, postdata, req_method, statistic):
         resp = requests.request(req_method, api_url, headers=headers, data=postdata)
@@ -99,14 +122,14 @@ class ListSpider:
             statistic['success'] = statistic.get('success', 0) + 1
             if resp.text == last_resp_text:
                 statistic['stop_reason'] = f"重复页响应内容，最后成功页：{cur}"
-                return False
+                return None
             else:
                 statistic['last_resp_text'] = resp.text
-                return True
+                return resp
         else:
             if last_fail + step == cur: # 有连续页面请求失败
                 statistic['stop_reason'] = f"连续页请求失败，最后失败页：{cur}"
-                return False
+                return None
             statistic['fail'].append(cur)
             statistic['last_fail'] = cur
         
@@ -126,7 +149,7 @@ class ListSpider:
                     'key': k
                 }
         
-    def store_to_minio(self, task_id: str, content: str, bucket_name: str = "spider-results") -> bool:
+    def store_to_minio(self, object_name: str, content: str, bucket_name: str = "spider-results") -> bool:
         """将内容存储到MinIO
         
         Args:
@@ -137,30 +160,23 @@ class ListSpider:
         Returns:
             bool: 是否成功存储
         """
-        try:
-            # 生成唯一的对象名称
-            import datetime
-            object_name = f"{datetime.datetime.now().strftime('%Y/%m/%d')}/{task_id}.txt"
-            
-            # 存储到MinIO
-            success = self.minio_client.upload_text(bucket_name, object_name, content)
-            print(success)
-            if success:
-                self.logger.info(f"[{self.worker_id}] 成功将任务 {task_id} 的结果存储到MinIO: {object_name}")
-            else:
-                self.logger.error(f"[{self.worker_id}] 存储任务 {task_id} 的结果到MinIO失败")
-            
-            return success
-        except Exception as e:
-            self.logger.error(f"[{self.worker_id}] 存储到MinIO时发生错误: {str(e)}")
-            return False
+        success = self.minio_client.upload_text(bucket_name, object_name, content)
+        print(success)
 
-    def save(self):
-        filepath = ''
-        collection = None
-        collection.insert(
+    def save(self, filepath: str) -> bool:
+        """将列表页路径保存到MongoDB
+        
+        Args:
+            filepath: 列表页路径
+            
+        Returns:
+            bool: 是否成功保存
+        """
+        collection = self.mongodb_service.get_collection('list')
+        result = collection.insert_one(
             {
-                'id'
-                'path'
+                'id': str(uuid.uuid4()),
+                'path': filepath
             }
         )
+        return result.acknowledged

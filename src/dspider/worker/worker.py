@@ -4,10 +4,12 @@ import logging
 import requests
 from typing import Dict, Any, Optional
 import uuid
+import json
 
 import requests
 
 from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
+from dspider.common.mongodb_client import mongodb_conn
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
 from dspider.common.minio_client import minio_client
@@ -311,12 +313,13 @@ class WorkerNode:
     def __init__(self):
         self.worker_id = str(uuid.uuid4())[:8]
         self.rabbitmq_client = rabbitmq_client
+        self.mongodb_service = mongodb_conn
         self.minio_client = minio_client
         # self.queue_name = config['worker']['task_queue']
         self.queue_name = 'sql2mq'
         self.prefetch_count = config['worker'].get('prefetch_count', 1)  # 默认值为1
         self.logger = logging.getLogger(f"WorkerNode-{self.worker_id}")
-        self.spider = ListSpider()
+        self.spider = ListSpider(self)
     
     def run(self):
         self.rabbitmq_client.consume_messages(

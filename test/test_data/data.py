@@ -1,3 +1,16 @@
+task_config = {
+    'task_name': 'JD',
+    'spider': [
+        {
+            'spider_name': 'list',
+            'p_num': 1,
+            'queue_name': 'list'
+        },
+        {
+            'spider_name': 'detail'
+        }
+    ]
+}
 jd_config = {
     "id": "1",
     "hr_index_url": "",
@@ -28,7 +41,7 @@ jd_config = {
         'url_rule'
     },
     'schedule': {
-        # 'round_datetime': 0,
+        'type': '', # 
         'interval': 10
     }
 }
@@ -36,9 +49,16 @@ jd_round = {
     'id': '',
     'jd_config_id': '',
     'round': 1, # 什么情况作为一轮，由于数据异常的重试要算作一轮吗？
-    
+    'round_datetime': 0,
+    'statistic': {
+        
+    }
 }
+
 list_ = {
+    'id': '',
+    'jd_config_id': '',
+    'round': 1,
     'page': 1, # 列表的第n页
                # 实际页码还是页码参数
     'file_path': '',

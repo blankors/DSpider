@@ -21,7 +21,7 @@ rabbitmq:
   password: admin123
   virtual_host: /spider
 minio:
-  host: minio
+  host: localhost
   port: 9000
   access_key: admin
   secret_key: admin123

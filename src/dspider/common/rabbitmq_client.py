@@ -318,7 +318,7 @@ class RabbitMQClient:
                     elif not auto_ack and not should_ack:
                         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
                 except Exception as e:
-                    logger.error(f"处理消息时出错: {str(e)}")
+                    logger.exception(f"处理消息时出错: {str(e)}")
                     if not auto_ack:
                         ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
             
