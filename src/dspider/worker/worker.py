@@ -5,6 +5,7 @@ import requests
 from typing import Dict, Any, Optional
 import uuid
 import json
+import importlib
 
 import requests
 
@@ -13,7 +14,7 @@ from dspider.common.mongodb_client import mongodb_conn
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
 from dspider.common.minio_client import minio_client
-from dspider.worker.list_spider import ListSpider
+from dspider.worker.spider.list_spider import ListSpider
 
 # 配置日志系统
 logging_config = {
@@ -309,6 +310,77 @@ class WorkerNodeByLLM:
             self.rabbitmq_client.disconnect()
             self.logger.info(f"[{self.worker_id}] Worker节点已停止")
 
+import importlib
+from importlib import import_module
+from pkgutil import iter_modules
+from types import ModuleType
+
+def walk_modules(path: str) -> list[ModuleType]:
+    """Loads a module and all its submodules from the given module path and
+    returns them. If *any* module throws an exception while importing, that
+    exception is thrown back.
+
+    For example: walk_modules('scrapy.utils')
+    """
+
+    mods: list[ModuleType] = []
+    mod = import_module(path)
+    mods.append(mod)
+    if hasattr(mod, "__path__"):
+        for _, subpath, ispkg in iter_modules(mod.__path__):
+            fullpath = path + "." + subpath
+            if ispkg:
+                mods += walk_modules(fullpath)
+            else:
+                submod = import_module(fullpath)
+                mods.append(submod)
+    return mods
+
+class Executor:
+    def __init__(self, spider_name: str):
+        self.spider_name = spider_name
+        
+        self.rabbitmq_client = rabbitmq_client
+        self.mongodb_service = mongodb_conn
+        self.minio_client = minio_client
+        
+        self.logger = logging.getLogger(f"Executor")
+        
+        # self.spider_module = importlib.import_module(f"dspider.worker.{spider_name}")
+        # import dspider.worker.spider as worker_module
+        # self.spider_class = getattr(worker_module, spider_name)
+        worker_modules = walk_modules('dspider.worker.spider')
+        for mod in worker_modules:
+            if hasattr(mod, self.spider_name):
+                self.spider_class = getattr(mod, self.spider_name)
+                self.spider = self.spider_class(self)
+                break
+        else:
+            raise ImportError(f"Spider {spider_name} not found in any module")
+        
+        self.worker_id = str(uuid.uuid4())[:8]
+    
+    def run(self):
+        self.rabbitmq_client.consume_messages(
+            self.queue_name,
+            callback=self.process_task,
+            auto_ack=False,
+            prefetch_count=self.prefetch_count
+        )
+    
+    def process_task(self, task: Dict[str, Any], properties: Dict[str, Any]) -> bool:
+        """处理单个任务
+        
+        Args:
+            task: 任务数据
+            properties: 消息属性
+            
+        Returns:
+            bool: 是否成功处理
+        """
+        self.logger.info(f"[{self.worker_id}] 收到任务: {task.get('_id', 'unknown')}")
+        self.spider.start(task)
+        
 class WorkerNode:
     def __init__(self):
         self.worker_id = str(uuid.uuid4())[:8]
