@@ -3,6 +3,7 @@ import uuid
 import time
 import typing
 import datetime
+import json
 
 import requests
 
@@ -57,6 +58,7 @@ class ListSpider:
         task_id = task.get('_id', str(uuid.uuid4()))
      
         request_params = task['request_params']
+        parse_rule_list = task['parse_rule']['list_page']
         api_url, headers, postdata_template = request_params['api_url'], request_params['headers'], request_params['postdata']
         postdata = postdata_template.copy()
         req_method = self.req_method_judger.judge(task)
@@ -83,7 +85,7 @@ class ListSpider:
             elif page_filed['location'] == 'postdata':
                 postdata[page_filed['key']] = postdata_template[page_filed['key']].format(cur)
             
-            resp = self.single_request(cur, step, api_url, headers, postdata, req_method, statistic)
+            resp = self.single_request(api_url, headers, postdata, req_method, cur, step, statistic, parse_rule_list)
             
             if not resp:
                 break
@@ -111,7 +113,7 @@ class ListSpider:
             'filepath': filepath
         }
 
-    def single_request(self, cur, step, api_url, headers, postdata, req_method, statistic):
+    def single_request(self, api_url, headers, postdata, req_method, cur, step, statistic, parse_rule_list):
         resp = requests.request(req_method, api_url, headers=headers, data=postdata)
         print(cur, resp.status_code, resp.text[-50:])
         statistic['total'] = statistic.get('total', 0) + 1
@@ -125,6 +127,26 @@ class ListSpider:
                 return None
             else:
                 statistic['last_resp_text'] = resp.text
+                resp_json = json.loads(resp.text)
+                
+                list_items_rule = parse_rule_list['list_data']
+                path = list_items_rule.split('.')
+                list_items: list = resp_json
+                for p in path:
+                    list_items = list_items.get(p)
+                    print(list_items, path)
+                
+                url_rule = parse_rule_list['url_rule']
+                url_path, params, postdata = url_rule['url_path'], url_rule['params'], url_rule['postdata']
+                for item in list_items:
+                    target_url = url_path
+                    if postdata == {}:
+                        target_url += '?'
+                        for list_data_key, url_key in params.items():
+                            target_url += f"{url_key}={item.get(list_data_key)}&" # TODO: 是否要考虑参数在目标URL的位置
+                        target_url = target_url[:-1] # 去掉最后一个&
+                        item['url'] = target_url
+                print(list_items)
                 return resp
         else:
             if last_fail + step == cur: # 有连续页面请求失败
