@@ -44,7 +44,55 @@ class PaginationGetterDefault(PaginationGetter):
             "jobSearch": ""
         }
         return task['pagination']
+
+class ListSpiderExtractor:
+    def __init__(self, parse_rule_list):
+        self.parse_rule_list = parse_rule_list
+
+class ListSpiderExtractorJson(ListSpiderExtractor):
     
+    def extract_list_data(self, resp_text: str):
+        self.list_items_rule = self.parse_rule_list['list_data']
+        resp_json = json.loads(resp_text)
+        path = self.list_items_rule.split('.')
+        list_items: list = resp_json
+        for p in path:
+            list_items = list_items.get(p)
+        return list_items
+    
+    def extract_url(self, resp_text: str):
+        list_items = self.extract_list_data(resp_text)
+        return self._extract_url_handler(list_items)
+        
+    def extract_other(self, resp_text: str):
+        pass
+    
+    def _extract_url_handler(self, list_items: list):
+        url_rule = self.parse_rule_list['url_rule']
+        url_path, params, postdata_rule = url_rule['url_path'], url_rule['params'], url_rule['postdata']
+        urls = []
+        postdata_list = []
+        for item in list_items:
+            target_url = url_path
+            if postdata_rule == {}:
+                target_url += '?'
+                for list_data_key, url_key in params.items():
+                    target_url += f"{url_key}={item.get(list_data_key)}&" # TODO: 是否要考虑参数在目标URL的位置
+                target_url = target_url[:-1] # 去掉最后一个&
+                item['url'] = target_url
+                urls.append(target_url)
+            else: # detail为post请求
+                target_postdata = {}
+                for list_data_key, url_key in postdata_rule.items():
+                    target_postdata[url_key] = item.get(list_data_key)
+                # TODO: 补充额外字段
+                item['url'] = target_postdata
+                postdata_list.append(target_postdata)
+        return list_items
+    
+    def _extract_other_handler(self, list_items: list):
+        pass
+
 class ListSpider:
     def __init__(self, executor: 'WorkerNode'):
         self.executor = executor
@@ -59,8 +107,10 @@ class ListSpider:
      
         request_params = task['request_params']
         parse_rule_list = task['parse_rule']['list_page']
+        
         api_url, headers, postdata_template = request_params['api_url'], request_params['headers'], request_params['postdata']
         postdata = postdata_template.copy()
+        
         req_method = self.req_method_judger.judge(task)
         pagination = self.pagination_getter.get_pagination(task)
         start, cur, step = pagination[0], pagination[0], pagination[1]
@@ -90,6 +140,11 @@ class ListSpider:
             if not resp:
                 break
             else:
+                extractor = ListSpiderExtractorJson(parse_rule_list) # Todo: 列表页一般情况下返回格式（json还是html）都是统一的
+                urls = extractor.extract_url(resp.text)
+                dup = self.is_dup(urls)
+                if dup:
+                    break
                 save_info = self.get_save_info(task, resp.text)
                 self.store_to_minio(save_info['filepath'], resp.text)
                 save_success = self.save(save_info['filepath'])
@@ -115,7 +170,6 @@ class ListSpider:
 
     def single_request(self, api_url, headers, postdata, req_method, cur, step, statistic, parse_rule_list):
         resp = requests.request(req_method, api_url, headers=headers, data=postdata)
-        print(cur, resp.status_code, resp.text[-50:])
         statistic['total'] = statistic.get('total', 0) + 1
         last_fail = statistic.get('last_fail')
         last_resp_text = statistic.get('last_resp_text')
@@ -127,34 +181,45 @@ class ListSpider:
                 return None
             else:
                 statistic['last_resp_text'] = resp.text
-                resp_json = json.loads(resp.text)
-                
-                list_items_rule = parse_rule_list['list_data']
-                path = list_items_rule.split('.')
-                list_items: list = resp_json
-                for p in path:
-                    list_items = list_items.get(p)
-                    print(list_items, path)
-                
-                url_rule = parse_rule_list['url_rule']
-                url_path, params, postdata = url_rule['url_path'], url_rule['params'], url_rule['postdata']
-                for item in list_items:
-                    target_url = url_path
-                    if postdata == {}:
-                        target_url += '?'
-                        for list_data_key, url_key in params.items():
-                            target_url += f"{url_key}={item.get(list_data_key)}&" # TODO: 是否要考虑参数在目标URL的位置
-                        target_url = target_url[:-1] # 去掉最后一个&
-                        item['url'] = target_url
-                print(list_items)
+                # urls = self.get_urls(resp, parse_rule_list)
                 return resp
         else:
+            statistic['fail'].append(cur)
+            statistic['last_fail'] = cur
             if last_fail + step == cur: # 有连续页面请求失败
                 statistic['stop_reason'] = f"连续页请求失败，最后失败页：{cur}"
                 return None
-            statistic['fail'].append(cur)
-            statistic['last_fail'] = cur
+            
+    def is_dup(self, urls: list):
+        return False
+    
+    def get_urls(self, resp, parse_rule_list) -> list:
+        resp_json = json.loads(resp.text)
+        list_items_rule = parse_rule_list['list_data']
+        path = list_items_rule.split('.')
+        list_items: list = resp_json
+        for p in path:
+            list_items = list_items.get(p)
         
+        url_rule = parse_rule_list['url_rule']
+        url_path, params, postdata_rule = url_rule['url_path'], url_rule['params'], url_rule['postdata']
+        for item in list_items:
+            target_url = url_path
+            if postdata_rule == {}: # detail为get请求
+                target_url += '?'
+                for list_data_key, url_key in params.items():
+                    target_url += f"{url_key}={item.get(list_data_key)}&" # TODO: 是否要考虑参数在目标URL的位置
+                target_url = target_url[:-1] # 去掉最后一个&
+                item['url'] = target_url
+            else: # detail为post请求
+                target_postdata = {}
+                for list_data_key, url_key in postdata_rule.items():
+                    target_postdata[url_key] = item.get(list_data_key)
+                # TODO: 补充额外字段
+                item['url'] = target_postdata
+        print(list_items)
+        
+    
     def get_page_filed(self, task):
         api_url = task['request_params']['api_url']
         postdata = task['request_params']['postdata']
@@ -183,7 +248,8 @@ class ListSpider:
             bool: 是否成功存储
         """
         success = self.minio_client.upload_text(bucket_name, object_name, content)
-        print(success)
+        self.logger.info(f"存储到MinIO成功: {object_name} {success}")
+        return success
 
     def save(self, filepath: str) -> bool:
         """将列表页路径保存到MongoDB

@@ -152,6 +152,36 @@ jd_config_tencent = {
         "interval": 10
     }
 }
+
+jd_result_tencent = {
+    "Code": 200,
+    "Data": {
+        "Count": 2305,
+        "Posts": [
+            {
+                "Id": 0,
+                "PostId": "1978338334812037120",
+                "RecruitPostId": 115312,
+                "RecruitPostName": "腾讯安全-WAF产品经理-深圳",
+                "CountryName": "中国",
+                "LocationName": "北京",
+                "BGName": "CSIG",
+                "ComCode": "",
+                "ComName": "",
+                "ProductName": "基础安全-三部",
+                "CategoryName": "产品",
+                "Responsibility": "1.负责腾讯云WAF产品策划与功能设计和商业化成功，调研、挖掘并洞察市场及用户需求，为所负责子业务的商业化结果成功负责，建设业内领先的WAF产品；\n2.负责腾讯云WAF产品的迭代与需求管理，输出功能设计原型图与需求文档；协调研发团队、设计团队与测试团队，推进产品迭代有节奏、高质量落地；\n3.负责腾讯云WAF产品子业务规划，持续关注行业发展、用户需求与竞品动态，输出有行业竞争优势的产品子业务策略设计、发展规划与演进路线图；\n4.参与腾讯云WAF产品运营与商业化运营并为子业务商业成功负责，与产品运营配合，推进产品的商业化进程，提升产品收入、规模与影响力。",
+                "LastUpdateTime": "2025年12月15日",
+                "PostURL": "http://careers.tencent.com/jobdesc.html?postId=1978338334812037120",
+                "SourceID": 1,
+                "IsCollect": False,
+                "IsValid": True,
+                "RequireWorkYearsName": "五年以上工作经验"
+            }
+        ]
+    }
+}
+
 jd_round = {
     "id": "",
     "jd_config_id": "",
