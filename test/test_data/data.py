@@ -1,17 +1,26 @@
 import datetime
 
-task_config = {
+system_config = {
+    "task_queue_name": "task",
+}
+task_config = { # TODO: 转为yaml
     "task_name": "JD",
     "spider": [
         {
             "spider_name": "list",
             "p_num": 1,
             "queue_name": "list"
+            # round: 1, # 
         },
         {
             "spider_name": "detail"
+            # round: 1, # JD爬虫的detail不需要考虑round，因为一个detail url只会抓取一次
         }
-    ]
+    ],
+    "datasource": { # executor中
+        "list_page": "list_page",
+        "bucket_name": "spider-results"
+    }
 }
 jd_config = {
     "id": "1",
@@ -59,6 +68,7 @@ jd_config = {
     },
     "schedule": {
         "type": "", # 
+        "round": 1, # 1轮
         "interval": 10
     }
 }
@@ -149,7 +159,8 @@ jd_config_tencent = {
     },
     "schedule": {
         "type": "", # 
-        "interval": 10
+        "interval": 10,
+        "round": 0,
     }
 }
 
@@ -199,6 +210,7 @@ list_ = {
     "page": 1, # 列表的第n页
                # 实际页码还是页码参数
     "file_path": "",
+    "insert_time": 0,
     
 }
 detail_ = {

@@ -5,14 +5,23 @@ import json
 import datetime
 from unittest.mock import Mock, MagicMock, patch
 
+from dspider.worker.spider.list_spider import PaginationGetterDefault
 from dspider.worker.spider.list_spider import ListSpider, ListSpiderExtractorJson
 # from dspider.worker.worker import WorkerNode, Executor
 
 # Fix the import path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from test.test_data.data import jd_config, jd_config_tencent, jd_result_tencent
+from test.test_data.data import jd_config, jd_config_tencent, jd_result_tencent, task_config
 
+class TestPaginationGetterDefault(unittest.TestCase):
+    def setUp(self):
+        self.parse_rule_list = [1,1]
+        
+    def test_get_pagination(self):
+        pagination_getter = PaginationGetterDefault()
+        pagination = pagination_getter.get_pagination(self.parse_rule_list)
+        self.assertEqual(pagination, self.parse_rule_list)
 
 class TestListSpider(unittest.TestCase):
     def setUp(self):
@@ -22,6 +31,7 @@ class TestListSpider(unittest.TestCase):
         self.minio_client_mock = Mock()
         
         # Attach mocks to executor
+        self.executor_mock.task_config = task_config
         self.executor_mock.mongodb_service = self.mongodb_service_mock
         self.executor_mock.minio_client = self.minio_client_mock
         
@@ -126,6 +136,7 @@ class TestListSpider(unittest.TestCase):
         
         self.list_spider.start(self.task)
         
+        # mock_single_request.assert_called_once() # 这句是为了确保single_request被调用了一次
         mock_single_request.assert_called()
         self.assertEqual(self.list_spider.statistic["total"], 1)
         self.assertEqual(self.list_spider.statistic["success"], 1)

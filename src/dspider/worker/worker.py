@@ -337,8 +337,9 @@ def walk_modules(path: str) -> list[ModuleType]:
     return mods
 
 class Executor:
-    def __init__(self, spider_name: str):
-        self.spider_name = spider_name
+    def __init__(self, task_config):
+        self.task_config = task_config
+        self.spider_name = self.task_config['spider_name']
         
         self.rabbitmq_client = rabbitmq_client
         self.mongodb_service = mongodb_conn
@@ -356,7 +357,7 @@ class Executor:
                 self.spider = self.spider_class(self)
                 break
         else:
-            raise ImportError(f"Spider {spider_name} not found in any module")
+            raise ImportError(f"Spider {self.spider_name} not found in any module")
         
         self.worker_id = str(uuid.uuid4())[:8]
     

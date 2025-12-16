@@ -36,14 +36,14 @@ class PaginationGetterDefault(PaginationGetter):
         pass
     
     def get_pagination(self, task: dict) -> list:
-        page = {
-            "pageIndex": "2",
-            "pageSize": "10",
-            "workCityJson": "[]",
-            "jobTypeJson": "[]",
-            "jobSearch": ""
-        }
         return task['pagination']
+
+class PaginationGetterCompute(PaginationGetter):
+    def __init__(self):
+        pass
+    
+    def get_pagination(self, task: dict) -> list:
+        pass
 
 class ListSpiderExtractor:
     def __init__(self, parse_rule_list):
@@ -93,11 +93,16 @@ class ListSpiderExtractorJson(ListSpiderExtractor):
     def _extract_other_handler(self, list_items: list):
         pass
 
+class ListSpiderExtractorHTML(ListSpiderExtractor):
+    pass
+
 class ListSpider:
     def __init__(self, executor: 'WorkerNode'):
         self.executor = executor
         self.mongodb_service = executor.mongodb_service
         self.minio_client = executor.minio_client
+        self.list_collection_name = executor.task_config['datasource']['list_page']
+        self.bucket_name = executor.task_config['datasource']['bucket_name']
         self.req_method_judger = ReqMethodHasPostJudger()
         self.pagination_getter = PaginationGetterDefault()
         self.logger = logging.getLogger(__name__)
@@ -145,14 +150,15 @@ class ListSpider:
                 dup = self.is_dup(urls)
                 if dup:
                     break
-                save_info = self.get_save_info(task, resp.text)
+                save_info = self.get_save_info(task, resp.text, cur)
                 self.store_to_minio(save_info['filepath'], resp.text)
+                self.mongodb_service.insert_one(self.list_collection_name, save_info)
                 save_success = self.save(save_info['filepath'])
             
             cur += step
             time.sleep(5)
 
-    def get_save_info(self, task, resp_text):
+    def get_save_info(self, task, resp_text: str, cur: int):
         """ 
         输入：任务信息+响应信息
         输出：
@@ -161,11 +167,17 @@ class ListSpider:
         :return: None
         """
         task_id = task.get('_id', str(uuid.uuid4()))
+        schedule = task['schedule']
+        round = schedule['round']
         import hashlib
         md5 = hashlib.md5(resp_text.encode('utf-8')).hexdigest()
-        filepath = f"{datetime.datetime.now().strftime('%Y/%m/%d')}/{task_id}_{md5}.txt" # 示例：2023/08/25/123456.txt
+        filepath = f"{datetime.datetime.now().strftime('%Y/%m/%d')}/{round}/{task_id}_{md5}.txt" # 示例：2023/08/25/123456.txt
         return {
-            'filepath': filepath
+            'jd_config_id': task_id,
+            'round': round,
+            'filepath': filepath,
+            'insert_time': datetime.datetime.now(),
+            'page': cur,
         }
 
     def single_request(self, api_url, headers, postdata, req_method, cur, step, statistic, parse_rule_list):
@@ -236,7 +248,7 @@ class ListSpider:
                     'key': k
                 }
         
-    def store_to_minio(self, object_name: str, content: str, bucket_name: str = "spider-results") -> bool:
+    def store_to_minio(self, object_name: str, content: str) -> bool:
         """将内容存储到MinIO
         
         Args:
@@ -247,7 +259,7 @@ class ListSpider:
         Returns:
             bool: 是否成功存储
         """
-        success = self.minio_client.upload_text(bucket_name, object_name, content)
+        success = self.minio_client.upload_text(self.bucket_name, object_name, content)
         self.logger.info(f"存储到MinIO成功: {object_name} {success}")
         return success
 
