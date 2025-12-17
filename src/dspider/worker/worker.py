@@ -344,6 +344,7 @@ def walk_modules(path: str) -> list[ModuleType]:
 
 class Executor:
     def __init__(self, spider_name: str, task_config):
+        self.executor_id = str(uuid.uuid4())[:8]
         self.task_config = task_config
         self.spider_name = spider_name
         self.spider_config = self.task_config['spider'][spider_name]
@@ -458,6 +459,7 @@ class WorkerNode:
         return False
     
     def init_executor(self, spider_name: str, task_config):
+        self.logger.info(f"[{self.worker_id}] 初始化Executor for spider {spider_name}")
         self.executor = Executor(spider_name, task_config)
         self.executor.run()
 

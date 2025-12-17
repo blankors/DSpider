@@ -108,6 +108,8 @@ class ListSpider:
         self.logger = logging.getLogger(__name__)
     
     def start(self, task: dict):
+        self.logger.info(f"[{self.executor.executor_id}] 开始执行任务 {task.get('task_name')}")
+        self.logger.debug(f"[{self.executor.executor_id}] 任务参数 {task}")
         task_id = task.get('_id', str(uuid.uuid4()))
      
         request_params = task['request_params']
@@ -154,9 +156,8 @@ class ListSpider:
                     statistic['stop_reason'] = f"无新详情页，最后请求页：{cur}"
                     break
                 save_info = self.get_save_info(task, resp.text, cur)
-                self.store_to_minio(save_info['filepath'], resp.text)
-                self.mongodb_service.insert_one(self.list_collection_name, save_info)
-                save_success = self.save(save_info['filepath'])
+                self.store_to_minio(save_info['filepath'], resp.text) # 一致性：如果save失败，minio中也会有数据
+                save_success = self.save(save_info)
             
             cur += step
             time.sleep(5)
@@ -235,8 +236,7 @@ class ListSpider:
                 # TODO: 补充额外字段
                 item['url'] = target_postdata
         print(list_items)
-        
-    
+
     def get_page_filed(self, task):
         api_url = task['request_params']['api_url']
         postdata = task['request_params']['postdata']
@@ -268,7 +268,7 @@ class ListSpider:
         self.logger.info(f"存储到MinIO成功: {object_name} {success}")
         return success
 
-    def save(self, filepath: str) -> bool:
+    def save(self, save_info: dict) -> bool:
         """将列表页路径保存到MongoDB
         
         Args:
@@ -277,11 +277,6 @@ class ListSpider:
         Returns:
             bool: 是否成功保存
         """
-        collection = self.mongodb_service.get_collection('list')
-        result = collection.insert_one(
-            {
-                'id': str(uuid.uuid4()),
-                'path': filepath
-            }
-        )
+        collection = self.mongodb_service.get_collection(self.list_collection_name)
+        result = collection.insert_one(save_info)
         return result.acknowledged
