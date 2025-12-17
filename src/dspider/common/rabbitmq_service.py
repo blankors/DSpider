@@ -11,7 +11,7 @@ from dspider.common.load_config import config
 
 logger = logging.getLogger(__name__)
 
-class RabbitMQClient:
+class RabbitMQService:
     """RabbitMQ连接管理类"""
     
     def __init__(self, host: str, port: int, username: str, password: str, virtual_host: str):
@@ -670,25 +670,3 @@ class AsyncRabbitMQClient:
         except Exception as e:
             logger.error(f"消费消息时出错: {str(e)}")
 
-# 全局异步RabbitMQ客户端实例
-from dspider.common.load_config import config
-
-async_rabbitmq_client = AsyncRabbitMQClient(
-    host=config['rabbitmq']['host'],
-    port=config['rabbitmq']['port'],
-    username=config['rabbitmq']['username'],
-    password=config['rabbitmq']['password'],
-    virtual_host=config['rabbitmq']['virtual_host']
-)
-
-try:
-    rabbitmq_client = RabbitMQClient(
-        host=config['rabbitmq']['host'],
-        port=config['rabbitmq']['port'],
-        username=config['rabbitmq']['username'],
-        password=config['rabbitmq']['password'],
-        virtual_host=config['rabbitmq']['virtual_host']
-    )
-    rabbitmq_client.connect()
-except Exception as e:
-    logger.error(f"RabbitMQ连接失败: {str(e)}")

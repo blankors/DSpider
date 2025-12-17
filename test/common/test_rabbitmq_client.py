@@ -2,7 +2,7 @@
 from context import common
 import unittest
 from unittest.mock import patch, MagicMock
-from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
+from dspider.common.rabbitmq_service import RabbitMQClient, rabbitmq_client
 
 class TestRabbitMQClient(unittest.TestCase):
     """RabbitMQ客户端的单元测试"""

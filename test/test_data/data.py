@@ -5,18 +5,22 @@ system_config = {
 }
 task_config = { # TODO: 转为yaml
     "task_name": "JD",
-    "spider": [
-        {
-            "spider_name": "list",
-            "p_num": 1,
-            "queue_name": "list"
+    "spider": { # 元素必须为{"spider_name": {}}
+        "ListSpider": {
+            "spider_name": "ListSpider", # 保留
+            "p_num": 3, # 必须
+            "queue_name": "list", # 必须。消费external_datasource_config的队列
+            "prefetch_count": 1,
             # round: 1, # 
         },
-        {
-            "spider_name": "detail"
-            # round: 1, # JD爬虫的detail不需要考虑round，因为一个detail url只会抓取一次
-        }
-    ],
+        # "DetailSpider": {
+        #     "spider_name": "DetailSpider", # 保留
+        #     "p_num": 1, # 必须
+        #     "queue_name": "detail", # 必须。消费list的队列
+        #     "prefetch_count": 1,
+        #     # round: 1, # JD爬虫的detail不需要考虑round，因为一个detail url只会抓取一次
+        # }
+    },
     "datasource": { # executor中
         "list_page": "list_page",
         "bucket_name": "spider-results"

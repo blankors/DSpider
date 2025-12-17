@@ -8,8 +8,8 @@ from typing import Any, Dict
 import asyncio
 
 from dspider.celery_worker.tasks import process_url_task
-from dspider.common.rabbitmq_client import rabbitmq_client
-from dspider.common.mongodb_client import mongodb_conn
+from dspider.common.rabbitmq_service import rabbitmq_client
+from dspider.common.mongodb_service import mongodb_conn
 import logging
 
 logger = logging.getLogger(__name__)

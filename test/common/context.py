@@ -4,9 +4,9 @@ import logging
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
 from src.dspider import common
-from src.dspider.common.mongodb_client import mongodb_conn, MongoDBConnection, mongodb_config
-from src.dspider.common.rabbitmq_client import rabbitmq_client, RabbitMQClient
-from src.dspider.common.minio_client import minio_client
+from dspider.common.mongodb_service import mongodb_conn, MongoDBConnection, mongodb_config
+from dspider.common.rabbitmq_service import rabbitmq_client, RabbitMQClient
+from dspider.common.minio_service import minio_client
 
 
 

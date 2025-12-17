@@ -9,7 +9,7 @@ from dspider.common.load_config import config
 
 logger = logging.getLogger(__name__)
 
-class MinIOClient:
+class MinIOService:
     """MinIO客户端管理类"""
     
     def __init__(self, endpoint: str, access_key: str, secret_key: str, secure: bool = False):
@@ -181,24 +181,3 @@ class MinIOClient:
         except Exception as e:
             logger.error(f"从MinIO获取文本时发生未知错误: {str(e)}")
             return None
-
-# 全局实例，从配置文件加载参数
-try:
-    # 尝试从配置文件加载MinIO配置
-    minio_config = config.get('minio', {})
-    minio_client = MinIOClient(
-        endpoint=f"{minio_config.get('host', 'localhost')}:{minio_config.get('port', 9000)}",
-        access_key=minio_config.get('access_key', 'admin'),
-        secret_key=minio_config.get('secret_key', 'admin123'),
-        secure=minio_config.get('secure', False)
-    )
-    logger.info("成功从配置文件加载MinIO连接参数")
-except Exception as e:
-    logger.error(f"从配置文件加载MinIO参数失败: {str(e)}")
-    # 创建默认实例作为备用
-    minio_client = MinIOClient(
-        endpoint="localhost:9000",
-        access_key="admin",
-        secret_key="admin123",
-        secure=False
-    )

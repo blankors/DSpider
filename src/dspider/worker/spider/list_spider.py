@@ -10,7 +10,7 @@ import requests
 from dspider.worker.judge_requests_method import ReqMethodHasPostJudger
 
 if typing.TYPE_CHECKING:
-    from dspider.worker.worker import WorkerNode
+    from dspider.worker.worker import Executor
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
@@ -97,7 +97,7 @@ class ListSpiderExtractorHTML(ListSpiderExtractor):
     pass
 
 class ListSpider:
-    def __init__(self, executor: 'WorkerNode'):
+    def __init__(self, executor: 'Executor'):
         self.executor = executor
         self.mongodb_service = executor.mongodb_service
         self.minio_client = executor.minio_client
@@ -131,7 +131,9 @@ class ListSpider:
             'stop_reason': '',
             'last_fail': -1,
             'fail': [],
-            'last_resp_text': ''
+            'last_resp_text': '',
+            'total': 0,
+            'success': 0,
         }
 
         while True:
@@ -147,8 +149,9 @@ class ListSpider:
             else:
                 extractor = ListSpiderExtractorJson(parse_rule_list) # Todo: 列表页一般情况下返回格式（json还是html）都是统一的
                 urls = extractor.extract_url(resp.text)
-                dup = self.is_dup(urls)
-                if dup:
+                has = self.has_new_detail_url(urls)
+                if not has:
+                    statistic['stop_reason'] = f"无新详情页，最后请求页：{cur}"
                     break
                 save_info = self.get_save_info(task, resp.text, cur)
                 self.store_to_minio(save_info['filepath'], resp.text)
@@ -157,6 +160,8 @@ class ListSpider:
             
             cur += step
             time.sleep(5)
+        
+        return statistic
 
     def get_save_info(self, task, resp_text: str, cur: int):
         """ 
@@ -202,8 +207,8 @@ class ListSpider:
                 statistic['stop_reason'] = f"连续页请求失败，最后失败页：{cur}"
                 return None
             
-    def is_dup(self, urls: list):
-        return False
+    def has_new_detail_url(self, urls: list):
+        return True
     
     def get_urls(self, resp, parse_rule_list) -> list:
         resp_json = json.loads(resp.text)

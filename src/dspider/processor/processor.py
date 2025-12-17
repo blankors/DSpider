@@ -2,8 +2,8 @@ import os
 import time
 import logging
 from typing import Dict, Any, List
-from dspider.common.mongodb_client import MongoDBConnection
-from dspider.common.rabbitmq_client import RabbitMQClient
+from dspider.common.mongodb_service import MongoDBConnection
+from dspider.common.rabbitmq_service import RabbitMQClient
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
 

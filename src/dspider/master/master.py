@@ -6,8 +6,8 @@ from typing import Dict, Any, List
 
 import structlog
 
-from dspider.common.mongodb_client import mongodb_conn
-from dspider.common.rabbitmq_client import rabbitmq_client
+from dspider.common.mongodb_service import mongodb_conn
+from dspider.common.rabbitmq_service import rabbitmq_client
 from dspider.common.load_config import config
 from dspider.master.master_config import master_config
 

@@ -7,7 +7,7 @@ from dspider.common.load_config import config
 
 logger = logging.getLogger(__name__)
 
-class MongoDBConnection:
+class MongoDBService:
     """MongoDB连接管理类"""
     
     def __init__(self, host: str, port: int, username: Optional[str], password: Optional[str], db_name: str):
@@ -213,16 +213,3 @@ class MongoDBConnection:
         except Exception as e:
             logger.error(f"统计文档失败: {str(e)}")
         return 0
-
-mongodb_config = config.get('mongodb')
-try:
-    mongodb_conn = MongoDBConnection(
-        host=mongodb_config.get('host', 'localhost'),
-        port=mongodb_config.get('port', 27017),
-        username=mongodb_config.get('username', None),
-        password=mongodb_config.get('password', None),
-        db_name=mongodb_config.get('db_name', 'spider_db'),
-    )
-    mongodb_conn.connect()
-except Exception as e:
-    logger.error(f"MongoDB连接失败: {str(e)}")

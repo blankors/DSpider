@@ -6,14 +6,14 @@ from typing import Dict, Any, Optional
 import uuid
 import json
 import importlib
+from threading import Thread
+from concurrent.futures import ThreadPoolExecutor
 
 import requests
 
-from dspider.common.rabbitmq_client import RabbitMQClient, rabbitmq_client
-from dspider.common.mongodb_client import mongodb_conn
+from dspider.common.datasource_manager import DataSourceManager, data_source_type
 from dspider.common.logger_config import LoggerConfig
 from dspider.common.load_config import config
-from dspider.common.minio_client import minio_client
 from dspider.worker.spider.list_spider import ListSpider
 
 # 配置日志系统
@@ -80,7 +80,13 @@ class WorkerNodeByLLM:
             )
         
         # 初始化RabbitMQ连接
-        self.rabbitmq_client = rabbitmq_client
+        self.rabbitmq_service = RabbitMQService(
+            host=self.config['rabbitmq']['host'],
+            port=self.config['rabbitmq']['port'],
+            username=self.config['rabbitmq']['username'],
+            password=self.config['rabbitmq']['password'],
+            virtual_host=self.config['rabbitmq']['virtual_host'],
+        )
         
         # 任务配置
         self.task_queue = self.config['worker']['task_queue']
@@ -337,15 +343,21 @@ def walk_modules(path: str) -> list[ModuleType]:
     return mods
 
 class Executor:
-    def __init__(self, task_config):
+    def __init__(self, spider_name: str, task_config):
         self.task_config = task_config
-        self.spider_name = self.task_config['spider_name']
+        self.spider_name = spider_name
+        self.spider_config = self.task_config['spider'][spider_name]
         
-        self.rabbitmq_client = rabbitmq_client
-        self.mongodb_service = mongodb_conn
-        self.minio_client = minio_client
+        data_source_manager = DataSourceManager()
+        self.rabbitmq_client = data_source_manager.get_data_source_with_config(data_source_type.RABBITMQ.value)
+        self.queue_name = self.spider_config['queue_name']
+        self.prefetch_count = self.spider_config['prefetch_count']
         
-        self.logger = logging.getLogger(f"Executor")
+        self.mongodb_service = data_source_manager.get_data_source_with_config(data_source_type.MONGODB.value)
+        self.minio_client = data_source_manager.get_data_source_with_config(data_source_type.MINIO.value)
+        
+        self.logger = logging.getLogger(f"Executor-{self.executor_id}")
+        self.logger.info(f"[{self.executor_id}] 初始化Executor for spider {self.spider_name}")
         
         # self.spider_module = importlib.import_module(f"dspider.worker.{spider_name}")
         # import dspider.worker.spider as worker_module
@@ -359,15 +371,23 @@ class Executor:
         else:
             raise ImportError(f"Spider {self.spider_name} not found in any module")
         
-        self.worker_id = str(uuid.uuid4())[:8]
+        self.executor_id = str(uuid.uuid4())[:8]
     
     def run(self):
-        self.rabbitmq_client.consume_messages(
-            self.queue_name,
-            callback=self.process_task,
-            auto_ack=False,
-            prefetch_count=self.prefetch_count
-        )
+        self.logger.info(f"[{self.executor_id}] Worker节点开始运行")
+        try:
+            self.rabbitmq_client.consume_messages(
+                self.queue_name,
+                callback=self.process_task,
+                auto_ack=False,
+                prefetch_count=self.prefetch_count
+            )
+        except KeyboardInterrupt:
+            self.logger.info(f"[{self.executor_id}] 用户中断，停止Executor")
+            raise
+        except Exception as e:
+            self.logger.error(f"[{self.executor_id}] 运行时错误: {str(e)}")
+            raise
     
     def process_task(self, task: Dict[str, Any], properties: Dict[str, Any]) -> bool:
         """处理单个任务
@@ -379,28 +399,40 @@ class Executor:
         Returns:
             bool: 是否成功处理
         """
-        self.logger.info(f"[{self.worker_id}] 收到任务: {task.get('_id', 'unknown')}")
-        self.spider.start(task)
-        
+        self.logger.info(f"[{self.executor_id}] 收到任务: {task.get('_id', 'unknown')}")
+        try:
+            self.spider.start(task)
+        except Exception as e:
+            self.logger.error(f"[{self.executor_id}] 处理任务时出错: {str(e)}")
+            return False
+        else:
+            return True
+
+task_queue_name = 'task'
+prefetch_count = 1
 class WorkerNode:
     def __init__(self):
         self.worker_id = str(uuid.uuid4())[:8]
-        self.rabbitmq_client = rabbitmq_client
-        self.mongodb_service = mongodb_conn
-        self.minio_client = minio_client
-        # self.queue_name = config['worker']['task_queue']
-        self.queue_name = 'sql2mq'
-        self.prefetch_count = config['worker'].get('prefetch_count', 1)  # 默认值为1
+        
+        data_source_manager = DataSourceManager()
+        self.rabbitmq_service = data_source_manager.get_data_source_with_config(data_source_type.RABBITMQ.value)
+        self.task_queue_name = task_queue_name
+        self.prefetch_count = prefetch_count
+        
         self.logger = logging.getLogger(f"WorkerNode-{self.worker_id}")
-        self.spider = ListSpider(self)
     
     def run(self):
-        self.rabbitmq_client.consume_messages(
-            self.queue_name,
-            callback=self.process_task,
-            auto_ack=False,
-            prefetch_count=self.prefetch_count
-        )
+        try:
+            self.rabbitmq_service.consume_messages(
+                self.task_queue_name,
+                callback=self.process_task,
+                auto_ack=False,
+                prefetch_count=self.prefetch_count
+            )
+        except KeyboardInterrupt:
+            self.logger.info(f"[{self.worker_id}] 用户中断，准备退出")
+        except Exception as e:
+            self.logger.error(f"[{self.worker_id}] 运行时错误: {str(e)}")
 
     def process_task(self, task: Dict[str, Any], properties: Dict[str, Any]) -> bool:
         """处理单个任务
@@ -414,9 +446,20 @@ class WorkerNode:
         """
         task_id = task.get('_id', str(uuid.uuid4()))
         self.logger.info(f"[{self.worker_id}] 收到任务: {task_id}")
-        self.spider.start(task)
+        self.logger.debug(f"[{self.worker_id}] 任务详情: {task}")
+        
+        spider_info: dict = task['spider']
+        for spider_name, spider_config in spider_info.items():
+            spider_p_num = spider_config['p_num']
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                for _ in range(spider_p_num):
+                    future = executor.submit(self.init_executor, spider_name, task)
         time.sleep(100)
         return False
+    
+    def init_executor(self, spider_name: str, task_config):
+        self.executor = Executor(spider_name, task_config)
+        self.executor.run()
 
 if __name__ == '__main__':
     worker = WorkerNode()

@@ -16,7 +16,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
-class MySQLConnection:
+class MySQLService:
     """MySQL连接管理类，支持连接池"""
     
     def __init__(self, host: str = 'localhost', port: int = 3306, 
@@ -411,30 +411,3 @@ class MySQLConnection:
         except Exception as e:
             logger.error(f"创建表失败: {str(e)}")
         return False
-
-# 全局实例，从配置文件加载参数
-try:
-    # 尝试从配置文件加载MySQL配置
-    mysql_config = config.get('mysql', {})
-    mysql_conn = MySQLConnection(
-        host=mysql_config.get('host', 'localhost'),
-        port=mysql_config.get('port', 3307),  # 使用修改后的端口
-        username=mysql_config.get('user', 'dspider'),
-        password=mysql_config.get('password', 'dspider_password'),
-        db_name=mysql_config.get('db', 'spider_db'),
-        use_pool=mysql_config.get('use_pool', True),
-        mincached=mysql_config.get('mincached', 5),
-        maxcached=mysql_config.get('maxcached', 20),
-        maxconnections=mysql_config.get('maxconnections', 100)
-    )
-    logger.info("成功从配置文件加载MySQL连接参数")
-    # 自动尝试连接
-    connected = mysql_conn.connect()
-    if not connected:
-        logger.warning("MySQL连接失败，请确保服务已启动且配置正确")
-except Exception as e:
-    logger.error(f"从配置文件加载MySQL参数失败: {str(e)}")
-    # 创建默认实例作为备用
-    mysql_conn = MySQLConnection()
-    # 尝试连接默认实例
-    mysql_conn.connect()

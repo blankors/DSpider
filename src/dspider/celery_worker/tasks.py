@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from dspider.common.mongodb_client import mongodb_conn
+from dspider.common.mongodb_service import mongodb_conn
 from dspider.celery_worker.celery_app import celery_app
 from playwright.async_api import async_playwright
 import platform
